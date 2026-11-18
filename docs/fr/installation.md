@@ -19,7 +19,7 @@
 Exécutez en tant que `root` ou via `sudo` :
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 chmod +x install.sh
 sudo ./install.sh
@@ -74,7 +74,7 @@ Le [`Dockerfile`](../../Dockerfile) compile en deux étapes :
 ### Étapes de mise en place
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 mkdir -p config && chmod 700 config
 cp config/config.example.yaml config/config.yaml
@@ -111,7 +111,7 @@ Si vous préférez le mode `bridge` :
 ## 4. Onboarding initial & Mises à jour
 
 1. Ouvrez l'URL du panel dans votre navigateur. Tant que `is_configured == false`, l'**assistant d'onboarding** configure le nom du serveur, Tailscale SSO, le code PIN Admin, Proxmox VE et génère votre premier jeton API Bearer `pve_...`.
-2. Vous pouvez ensuite scanner le QR Code (`GET /api/discovery/qr`) depuis [`pve-center-apple`](https://github.com/Fairy-Jeux/pve-center-apple) ou saisir l'URL et le jeton dans [`pve-center-clients`](https://github.com/Fairy-Jeux/pve-center-clients).
+2. Vous pouvez ensuite scanner le QR Code (`GET /api/discovery/qr`) depuis [`pve-center-apple`](https://github.com/PVE-Center/pve-center-apple) ou saisir l'URL et le jeton dans [`pve-center-clients`](https://github.com/PVE-Center/pve-center-clients).
 3. Pour mettre à jour tout en conservant `./config/` (`config.yaml`, `state.db`, `AuthKey.p8`) :
    ```bash
    cd /opt/pve-panel

@@ -8,10 +8,10 @@ Issues and pull requests should target the repository that owns the component:
 
 | Repository | Scope |
 |---|---|
-| [`Fairy-Jeux/pve-panel`](https://github.com/Fairy-Jeux/pve-panel) | Core FastAPI backend, embedded React Web UI, Docker image, `install.sh` |
-| [`Fairy-Jeux/pve-center-apple`](https://github.com/Fairy-Jeux/pve-center-apple) | Native Swift 6 / SwiftUI apps for iOS, iPadOS, macOS, and tvOS |
-| [`Fairy-Jeux/pve-center-clients`](https://github.com/Fairy-Jeux/pve-center-clients) | Cross-platform desktop (Windows/Linux via Tauri v2) and Android (Capacitor 8) clients |
-| [`Fairy-Jeux/pve-center-website`](https://github.com/Fairy-Jeux/pve-center-website) | Official VitePress website and full bilingual documentation portal |
+| [`PVE-Center/pve-panel`](https://github.com/PVE-Center/pve-panel) | Core FastAPI backend, embedded React Web UI, Docker image, `install.sh` |
+| [`PVE-Center/pve-center-apple`](https://github.com/PVE-Center/pve-center-apple) | Native Swift 6 / SwiftUI apps for iOS, iPadOS, macOS, and tvOS |
+| [`PVE-Center/pve-center-clients`](https://github.com/PVE-Center/pve-center-clients) | Cross-platform desktop (Windows/Linux via Tauri v2) and Android (Capacitor 8) clients |
+| [`PVE-Center/pve-center-website`](https://github.com/PVE-Center/pve-center-website) | Official VitePress website and full bilingual documentation portal |
 
 ## Development Setup
 

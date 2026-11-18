@@ -104,7 +104,7 @@ flowchart LR
 ### Option 1 — Automated Installer (`install.sh`)
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 chmod +x install.sh
 sudo ./install.sh
@@ -119,7 +119,7 @@ Useful flags: `--in-container`, `--ts-hostname <name>`, `--allowed-users <emails
 ### Option 2 — Docker Compose (Manual)
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 mkdir -p config
 cp config/config.example.yaml config/config.yaml
@@ -162,14 +162,14 @@ Companion native clients connect directly to `pve-panel` over Tailscale HTTPS, L
 
 ## 🌐 Companion Repositories
 
-The PVE Command Center ecosystem is organized into four dedicated repositories under [`Fairy-Jeux`](https://github.com/Fairy-Jeux):
+The PVE Command Center ecosystem is organized into four dedicated repositories under [`PVE-Center`](https://github.com/PVE-Center):
 
 | Repository | Purpose | Stack |
 |---|---|---|
-| **[`pve-panel`](https://github.com/Fairy-Jeux/pve-panel)** *(this repo)* | Core server, REST/WS/SSE API, AlertEngine, embedded Web UI, Docker & `install.sh` | Python 3.12, FastAPI, SQLite WAL, React 19, Vite, Tailwind |
-| **[`pve-center-apple`](https://github.com/Fairy-Jeux/pve-center-apple)** | Native Apple application for iPhone, iPad, Mac, and Apple TV | Swift 6, SwiftUI, SwiftData, CryptoKit, Network.framework |
-| **[`pve-center-clients`](https://github.com/Fairy-Jeux/pve-center-clients)** | Desktop & mobile apps for Windows, Linux, and Android | Tauri v2 (Rust), Capacitor 8 (Android), React 19 |
-| **[`pve-center-website`](https://github.com/Fairy-Jeux/pve-center-website)** | Project landing page, platform downloads & full bilingual docs portal | VitePress, Liquid Glass / Cider CSS |
+| **[`pve-panel`](https://github.com/PVE-Center/pve-panel)** *(this repo)* | Core server, REST/WS/SSE API, AlertEngine, embedded Web UI, Docker & `install.sh` | Python 3.12, FastAPI, SQLite WAL, React 19, Vite, Tailwind |
+| **[`pve-center-apple`](https://github.com/PVE-Center/pve-center-apple)** | Native Apple application for iPhone, iPad, Mac, and Apple TV | Swift 6, SwiftUI, SwiftData, CryptoKit, Network.framework |
+| **[`pve-center-clients`](https://github.com/PVE-Center/pve-center-clients)** | Desktop & mobile apps for Windows, Linux, and Android | Tauri v2 (Rust), Capacitor 8 (Android), React 19 |
+| **[`pve-center-website`](https://github.com/PVE-Center/pve-center-website)** | Project landing page, platform downloads & full bilingual docs portal | VitePress, Liquid Glass / Cider CSS |
 
 ---
 

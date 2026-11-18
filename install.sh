@@ -121,7 +121,7 @@ resolve_repo_dir() {
 
   local repo_url=""
   log_warn "Dépôt pve-panel introuvable localement."
-  read_input repo_url "URL Git du dépôt pve-panel à cloner dans /opt/pve-panel" "https://github.com/Fairy-Jeux/pve-panel.git"
+  read_input repo_url "URL Git du dépôt pve-panel à cloner dans /opt/pve-panel" "https://github.com/PVE-Center/pve-panel.git"
   if [[ -z "$repo_url" ]]; then
     log_err "Exécutez install.sh depuis le dossier cloné ou indiquez une URL Git valide."
     exit 1

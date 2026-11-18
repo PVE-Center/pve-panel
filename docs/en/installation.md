@@ -19,7 +19,7 @@
 Run as `root` or via `sudo`:
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 chmod +x install.sh
 sudo ./install.sh
@@ -74,7 +74,7 @@ The [`Dockerfile`](../../Dockerfile) builds in two stages:
 ### Setup Steps
 
 ```bash
-git clone https://github.com/Fairy-Jeux/pve-panel.git
+git clone https://github.com/PVE-Center/pve-panel.git
 cd pve-panel
 mkdir -p config && chmod 700 config
 cp config/config.example.yaml config/config.yaml
@@ -111,7 +111,7 @@ If you prefer Docker `bridge` mode:
 ## 4. First-Run Onboarding & Updates
 
 1. Open your panel URL in a browser. While `is_configured == false`, the **Onboarding Wizard** walks through server naming, Tailscale SSO settings, an Admin PIN, Proxmox VE API credentials, and minting your first `pve_...` Bearer API token.
-2. You can later scan the QR code (`GET /api/discovery/qr`) from [`pve-center-apple`](https://github.com/Fairy-Jeux/pve-center-apple) or enter the server URL & token in [`pve-center-clients`](https://github.com/Fairy-Jeux/pve-center-clients).
+2. You can later scan the QR code (`GET /api/discovery/qr`) from [`pve-center-apple`](https://github.com/PVE-Center/pve-center-apple) or enter the server URL & token in [`pve-center-clients`](https://github.com/PVE-Center/pve-center-clients).
 3. To upgrade an existing deployment while preserving `./config/` (which holds `config.yaml`, `state.db`, and optional `AuthKey.p8`):
    ```bash
    cd /opt/pve-panel

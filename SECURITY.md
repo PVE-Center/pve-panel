@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are applied to the active `main` branch of `Fairy-Jeux/pve-panel`:
+Security fixes are applied to the active `main` branch of `PVE-Center/pve-panel`:
 
 | Version / Branch | Supported |
 |---|---|
@@ -15,7 +15,7 @@ Security fixes are applied to the active `main` branch of `Fairy-Jeux/pve-panel`
 
 Instead, report vulnerabilities privately through GitHub Security Advisories:
 
-- **[Report a security vulnerability](https://github.com/Fairy-Jeux/pve-panel/security/advisories/new)**
+- **[Report a security vulnerability](https://github.com/PVE-Center/pve-panel/security/advisories/new)**
 
 When submitting a report, please include:
 

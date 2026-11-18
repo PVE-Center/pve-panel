@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: PVE Center Documentation Portal
-    url: https://github.com/Fairy-Jeux/pve-center-website
+    url: https://github.com/PVE-Center/pve-center-website
     about: Guides, architecture overview, and API/configuration documentation across the ecosystem
   - name: Apple Native App Issues (iOS / iPadOS / macOS / tvOS)
-    url: https://github.com/Fairy-Jeux/pve-center-apple/issues
+    url: https://github.com/PVE-Center/pve-center-apple/issues
     about: Report bugs or feature requests for the Swift 6 / SwiftUI Apple apps
   - name: Desktop & Android Client Issues (Windows / Linux / Android)
-    url: https://github.com/Fairy-Jeux/pve-center-clients/issues
+    url: https://github.com/PVE-Center/pve-center-clients/issues
     about: Report bugs or feature requests for Tauri v2 desktop or Capacitor Android clients
   - name: Security Vulnerability Disclosure
-    url: https://github.com/Fairy-Jeux/pve-panel/security/advisories/new
+    url: https://github.com/PVE-Center/pve-panel/security/advisories/new
     about: Privately report security vulnerabilities without exposing sensitive details
