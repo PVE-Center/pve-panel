@@ -10,6 +10,7 @@ import hmac
 import inspect
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import tempfile

@@ -6,12 +6,16 @@ Tous les endpoints API sont exposés sous `/api` par FastAPI (`backend/app/main.
 
 ---
 
-## 1. Authentification & Exemptions publiques
+## 1. Authentification, Rôles RBAC & Exemptions publiques
 
 Chaque route protégée passe par `TailscaleSSOMiddleware` (`backend/app/middleware/tailscale_auth.py`) :
 
 - **Loopback (`127.0.0.1` / `::1`)** : en-tête `Tailscale-User-Login` (présent dans `security.allowed_tailscale_users`), `Authorization: Bearer <token>`, ou `dev_auth_bypass: true`.
 - **Hors loopback (LAN / Distant)** : `Authorization: Bearer <api_token_ou_session_jwt>` (pour WebSocket/SSE, le paramètre de requête `?token=<token>` est aussi accepté).
+- **Application granulaire des rôles (`role`)** :
+  - `admin` : accès complet en lecture et écriture (YAML déclaratif, jetons API, onboarding, code PIN, utilisateurs, opérations).
+  - `operator` / `device` : lectures + écritures opérationnelles (`/api/pve/*`, `/api/ops/*`, `/api/incidents/*`, tests de sondes et enregistrement push) ; les écritures de config ou lectures YAML/jetons renvoient `403`.
+  - `viewer` : télémétrie en lecture seule (`GET`/`HEAD`) + enregistrement push ; toute route d'écriture renvoie `403`.
 - **Toujours publiques** :
   - `GET /api/health`
   - `POST /api/auth/login`
@@ -72,12 +76,13 @@ Types supportés : `config_reloaded`, `service_status_changed`, `alert_triggered
 
 ---
 
-## 5. Proxmox VE & Stockage
+## 5. Cluster Proxmox VE & Stockage
 
 | Méthode | Chemin | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/pve/overview` | Auth | Retourne `{online, node, counts, resources, external_storage}` (CPU, RAM, swap, rootfs, stockages, LXCs/VMs, pool MergerFS, disques SMART, SSD système) |
-| `POST` | `/api/pve/{vm_type}/{vmid}/{action}` | Auth | `vm_type`: `lxc \| qemu` ; `action`: `start \| stop \| reboot \| shutdown`. Bloque `stop`/`shutdown` si `vmid == panel_self_vmid` (`400`) |
+| `GET` | `/api/pve/nodes` | Auth | Liste les nœuds du cluster Proxmox VE avec `status`, `online`, `cpu_pct`, `mem_pct` et `uptime` |
+| `GET` | `/api/pve/overview` | Auth | Optionnel `?node=<nom> \| * \| all` : retourne `{online, selected_node, failover_active, cluster_nodes, node, counts, resources, external_storage}` |
+| `POST` | `/api/pve/{vm_type}/{vmid}/{action}` | Operator / Admin | Optionnel `?node=<nom>` ; `vm_type`: `lxc \| qemu` ; `action`: `start \| stop \| reboot \| shutdown` (`400` si `vmid == panel_self_vmid`) |
 
 ---
 
@@ -146,3 +151,12 @@ Types supportés : `config_reloaded`, `service_status_changed`, `alert_triggered
 | `GET` | `/api/pairing/sessions/{pin}` | Public (limité) | Retourne `public_key` du récepteur, `device_name`, `expires_at`, `completed` |
 | `POST` | `/api/pairing/sessions/{pin}/complete` | Public (limité) | Corps `{sender_public_key, nonce, ciphertext, tag}` -> stocke le bloc chiffré et émet `pairing_completed` |
 | `GET` | `/api/pairing/sessions/{pin}/payload` | Public (limité) | Consomme le bloc chiffré en lecture unique et détruit la session (`425` si en attente) |
+
+---
+
+## 10. Métriques Prometheus
+
+| Méthode | Chemin | Auth | Description |
+|---|---|---|---|
+| `GET` | `/metrics` | Auth (`viewer`+) | Format texte Prometheus (`0.0.4`) exposant `pve_center_up`, `pve_custom_service_up`, `pve_custom_service_latency_ms`, `pve_incidents_active_total`, `pve_node_*` et `pve_guest_up` |
+| `GET` | `/api/metrics/prometheus` | Auth (`viewer`+) | Alias sous `/api` retournant la même charge Prometheus |

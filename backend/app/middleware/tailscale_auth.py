@@ -20,6 +20,16 @@ from app.config_manager import (
 LOCAL_LOOPBACK_IPS = frozenset({"127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1"})
 
 _WEBHOOK_INGEST_RE = re.compile(r"^/api/custom-services/[^/]+/webhook$")
+_CUSTOM_SERVICE_TEST_RE = re.compile(r"^/api/custom-services/[^/]+/test$")
+_SERVICE_ITEM_TEST_RE = re.compile(r"^/api/services/items/[^/]+/test$")
+_ADMIN_ONLY_READ_PATHS = frozenset(
+    {
+        "/api/config/yaml",
+        "/api/config/export",
+        "/api/auth/tokens",
+        "/api/discovery/qr",
+    }
+)
 _FIRST_RUN_EXEMPT_EXACT = frozenset(
     {
         "/api/setup/status",
@@ -60,7 +70,7 @@ def _is_public_exempt(path: str, scope_type: str, method: str) -> bool:
         return True
     if path.startswith("/assets/"):
         return True
-    if scope_type == "http" and method in ("GET", "HEAD") and not path.startswith("/api"):
+    if scope_type == "http" and method in ("GET", "HEAD") and not path.startswith("/api") and path != "/metrics":
         return True
     if scope_type == "http" and method == "POST" and _WEBHOOK_INGEST_RE.match(path):
         return True
@@ -70,6 +80,44 @@ def _is_public_exempt(path: str, scope_type: str, method: str) -> bool:
             return True
 
     return False
+
+
+def check_role_permission(role: str, path: str, method: str) -> tuple[bool, str]:
+    """Enforce role-based permissions (`admin`, `operator`, `viewer`, `device`) on authenticated HTTP routes."""
+    normalized_role = (role or "viewer").strip().lower()
+    normalized_method = method.upper()
+
+    if normalized_role == "admin":
+        return True, ""
+
+    if any(path == p or path.startswith(f"{p}/") for p in _ADMIN_ONLY_READ_PATHS):
+        return (
+            False,
+            "Droits insuffisants : rôle 'admin' requis pour accéder à cette ressource.",
+        )
+
+    if path == "/api/notifications/devices" or path.startswith("/api/notifications/devices/"):
+        return True, ""
+
+    if normalized_method in ("GET", "HEAD", "OPTIONS"):
+        return True, ""
+
+    if normalized_role in ("operator", "device"):
+        if (
+            path.startswith("/api/pve/")
+            or path.startswith("/api/operations/")
+            or path.startswith("/api/ops/")
+            or path.startswith("/api/incidents/")
+            or _CUSTOM_SERVICE_TEST_RE.match(path)
+            or _SERVICE_ITEM_TEST_RE.match(path)
+        ):
+            return True, ""
+        return (
+            False,
+            "Droits insuffisants : rôle 'admin' requis pour modifier la configuration.",
+        )
+
+    return False, "Droits insuffisants : le rôle 'viewer' est en lecture seule."
 
 
 def authenticate_scope(scope: Scope) -> tuple[dict[str, Any] | None, int, str]:
@@ -182,6 +230,17 @@ class TailscaleSSOMiddleware:
 
         if user is not None:
             scope.setdefault("state", {})["user"] = user
+            if scope_type == "http" and not _is_public_exempt(path, scope_type, method):
+                allowed, deny_reason = check_role_permission(
+                    str(user.get("role", "admin")), path, method
+                )
+                if not allowed:
+                    deny_resp: Response = JSONResponse(
+                        status_code=403,
+                        content={"detail": deny_reason},
+                    )
+                    await deny_resp(scope, receive, send)
+                    return
             await self.app(scope, receive, send)
             return
 

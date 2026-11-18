@@ -210,9 +210,9 @@ npm run build
 - [x] 5-protocol extensible connectors (`http_rest`, `tcp_port`, `icmp_ping`, `json_metrics`, `webhook_ingest`)
 - [x] SQLite WAL `AlertEngine` + Discord, Telegram, Generic/ntfy, and APNs HTTP/2 dispatchers
 - [x] Encrypted 6-digit PIN pairing relay (`P-256 ECDH` + `AES-256-GCM`) and Bonjour/mDNS discovery
-- [ ] Multi-node Proxmox VE cluster aggregation (`nodes/*` selector & failover views)
-- [ ] Prometheus `/metrics` endpoint & OpenTelemetry export option
-- [ ] Role-based scoping enforcement (`operator` vs `viewer` vs `admin`) across write routes
+- [x] Multi-node Proxmox VE cluster aggregation (`GET /api/pve/nodes`, `?node=` selector & automatic failover views)
+- [x] Prometheus `/metrics` & `/api/metrics/prometheus` exposition endpoints
+- [x] Role-based scoping enforcement (`admin`, `operator`, `viewer`, `device`) across write & sensitive routes
 
 ---
 

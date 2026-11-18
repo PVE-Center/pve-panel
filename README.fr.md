@@ -210,9 +210,9 @@ npm run build
 - [x] 5 connecteurs de supervision extensibles (`http_rest`, `tcp_port`, `icmp_ping`, `json_metrics`, `webhook_ingest`)
 - [x] `AlertEngine` SQLite WAL + notifications Discord, Telegram, Webhooks génériques/ntfy et APNs HTTP/2
 - [x] Relais d'appairage chiffré par PIN à 6 chiffres (`P-256 ECDH` + `AES-256-GCM`) et découverte Bonjour/mDNS
-- [ ] Agrégation multi-nœuds Proxmox VE (sélecteur de nœuds et bascule cluster)
-- [ ] Export `/metrics` Prometheus et télémétrie OpenTelemetry optionnelle
-- [ ] Application granulaire des rôles (`operator` vs `viewer` vs `admin`) sur les routes d'écriture
+- [x] Agrégation multi-nœuds Proxmox VE (`GET /api/pve/nodes`, sélecteur `?node=` et bascule automatique *failover*)
+- [x] Endpoints Prometheus `/metrics` et `/api/metrics/prometheus`
+- [x] Application granulaire des rôles (`admin`, `operator`, `viewer`, `device`) sur les routes d'écriture et sensibles
 
 ---
 

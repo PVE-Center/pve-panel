@@ -34,7 +34,6 @@ from app.config import (  # noqa: E402
     update_env_file,
 )
 from app.config_manager import (  # noqa: E402
-    ConfigManager,
     get_config_manager,
     hash_pin,
     hash_token,
@@ -920,4 +919,223 @@ def test_category_service_crud_and_move_in_legacy_services_yaml(isolated_env) ->
         raw3 = yaml.safe_load(services_path.read_text(encoding="utf-8"))
         assert len(raw3["categories"]) == 1
         assert [s["id"] for s in raw3["categories"][0]["services"]] == ["uptime-kuma"]
+
+
+@pytest.mark.asyncio
+async def test_rbac_scoping_enforced_across_roles(isolated_env) -> None:
+    from app.routers import proxmox as proxmox_router
+
+    cfg_path: Path = isolated_env["config_path"]
+    adm_tok = "pve_adm_role_tok"
+    op_tok = "pve_op_role_tok"
+    view_tok = "pve_view_role_tok"
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "security": {
+                    "tailscale_sso_enabled": False,
+                    "api_tokens": [
+                        {"id": "r-adm", "name": "Admin", "token_hash": hash_token(adm_tok), "role": "admin"},
+                        {"id": "r-op", "name": "Operator", "token_hash": hash_token(op_tok), "role": "operator"},
+                        {"id": "r-view", "name": "Viewer", "token_hash": hash_token(view_tok), "role": "viewer"},
+                    ],
+                },
+                "proxmox": {
+                    "host": "https://pve.local:8006",
+                    "token_id": "root@pam!panel",
+                    "token_secret": "sec",
+                    "default_node": "pve",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    get_config_manager().reload(emit_event=False)
+    get_settings.cache_clear()
+
+    app = _build_test_app()
+    app.include_router(proxmox_router.router)
+
+    def _pve_mock(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/status/start"):
+            return httpx.Response(200, json={"data": "UPID:pve:0001"})
+        if req.url.path.endswith("/api2/json/nodes"):
+            return httpx.Response(200, json={"data": [{"node": "pve", "status": "online"}]})
+        return httpx.Response(200, json={"data": {}})
+
+    app.state.pve_http = httpx.AsyncClient(transport=httpx.MockTransport(_pve_mock))
+
+    try:
+        # Viewer: GET protected OK, POST PVE action blocked (403), GET admin YAML blocked (403)
+        h_view = {"Authorization": f"Bearer {view_tok}"}
+        assert (await _asgi_request(app, "GET", "/api/pve/nodes", headers=h_view)).status_code == 200
+        assert (await _asgi_request(app, "POST", "/api/pve/lxc/101/start", headers=h_view)).status_code == 403
+        assert (await _asgi_request(app, "GET", "/api/config/yaml", headers=h_view)).status_code == 403
+
+        # Operator: operational PVE write allowed (200), admin config/token mutation & reads blocked (403)
+        h_op = {"Authorization": f"Bearer {op_tok}"}
+        assert (await _asgi_request(app, "POST", "/api/pve/lxc/101/start", headers=h_op)).status_code == 200
+        assert (await _asgi_request(app, "GET", "/api/auth/tokens", headers=h_op)).status_code == 403
+        assert (
+            await _asgi_request(app, "PUT", "/api/setup/config", headers=h_op, json_body={"env": {"PVE_NODE": "pve2"}})
+        ).status_code == 403
+
+        # Admin: allowed everywhere
+        h_adm = {"Authorization": f"Bearer {adm_tok}"}
+        assert (await _asgi_request(app, "GET", "/api/config/yaml", headers=h_adm)).status_code == 200
+        assert (await _asgi_request(app, "GET", "/api/auth/tokens", headers=h_adm)).status_code == 200
+    finally:
+        await app.state.pve_http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_multinode_pve_cluster_aggregation_and_failover(isolated_env) -> None:
+    from app.routers import proxmox as proxmox_router
+
+    cfg_path: Path = isolated_env["config_path"]
+    tok = "pve_cluster_tok"
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "security": {
+                    "api_tokens": [
+                        {"id": "c-1", "name": "Cluster", "token_hash": hash_token(tok), "role": "admin"}
+                    ]
+                },
+                "proxmox": {
+                    "host": "https://pve.cluster.local:8006",
+                    "token_id": "root@pam!panel",
+                    "token_secret": "sec",
+                    "default_node": "pve1",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    get_config_manager().reload(emit_event=False)
+    get_settings.cache_clear()
+
+    node1_online = True
+
+    def _cluster_mock(req: httpx.Request) -> httpx.Response:
+        path = req.url.path
+        if path == "/api2/json/nodes":
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"node": "pve1", "status": "online" if node1_online else "offline", "cpu": 0.2, "maxcpu": 8, "mem": 4000, "maxmem": 16000, "uptime": 3600},
+                        {"node": "pve2", "status": "online", "cpu": 0.4, "maxcpu": 16, "mem": 8000, "maxmem": 32000, "uptime": 7200},
+                    ]
+                },
+            )
+        if "/nodes/pve1/" in path and not node1_online:
+            return httpx.Response(500, json={"errors": "node offline"})
+        if path == "/api2/json/nodes/pve1/status":
+            return httpx.Response(200, json={"data": {"cpu": 0.2, "memory": {"used": 4000, "total": 16000}, "uptime": 3600, "cpuinfo": {"cpus": 8}}})
+        if path == "/api2/json/nodes/pve2/status":
+            return httpx.Response(200, json={"data": {"cpu": 0.4, "memory": {"used": 8000, "total": 32000}, "uptime": 7200, "cpuinfo": {"cpus": 16}}})
+        if path == "/api2/json/nodes/pve1/lxc":
+            return httpx.Response(200, json={"data": [{"vmid": 101, "name": "ct-web", "status": "running", "cpu": 0.1, "cpus": 2, "mem": 500, "maxmem": 1000}]})
+        if path == "/api2/json/nodes/pve2/qemu":
+            return httpx.Response(200, json={"data": [{"vmid": 201, "name": "vm-db", "status": "running", "cpu": 0.3, "cpus": 4, "mem": 2000, "maxmem": 4000}]})
+        if path.endswith("/storage"):
+            return httpx.Response(200, json={"data": [{"storage": "local-lvm", "type": "lvmthin", "active": 1, "used": 100, "total": 1000}]})
+        return httpx.Response(200, json={"data": []})
+
+    app = _build_test_app()
+    app.include_router(proxmox_router.router)
+    app.state.pve_http = httpx.AsyncClient(transport=httpx.MockTransport(_cluster_mock))
+    headers = {"Authorization": f"Bearer {tok}"}
+
+    try:
+        r_nodes = await _asgi_request(app, "GET", "/api/pve/nodes", headers=headers)
+        assert r_nodes.status_code == 200
+        assert [n["name"] for n in r_nodes.json()["nodes"]] == ["pve1", "pve2"]
+
+        r_all = await _asgi_request(app, "GET", "/api/pve/overview?node=*", headers=headers)
+        assert r_all.status_code == 200
+        all_data = r_all.json()
+        assert all_data["online"] is True
+        assert all_data["counts"]["total"] == 2
+        assert {r["node"] for r in all_data["resources"]} == {"pve1", "pve2"}
+        assert all_data["node"]["mem_total_bytes"] == 48000
+
+        # Simulate primary pve1 offline -> automatic failover to pve2
+        node1_online = False
+        r_failover = await _asgi_request(app, "GET", "/api/pve/overview", headers=headers)
+        assert r_failover.status_code == 200
+        fo = r_failover.json()
+        assert fo["failover_active"] is True
+        assert fo["selected_node"] == "pve2"
+        assert fo["resources"][0]["name"] == "vm-db"
+    finally:
+        await app.state.pve_http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_prometheus_metrics_endpoints_and_auth(isolated_env) -> None:
+    from app.routers import metrics as metrics_router
+    from app.services.state_store import StateStore
+
+    cfg_path: Path = isolated_env["config_path"]
+    view_tok = "pve_prom_viewer"
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "security": {
+                    "api_tokens": [
+                        {"id": "v-1", "name": "Prom", "token_hash": hash_token(view_tok), "role": "viewer"}
+                    ]
+                },
+                "custom_services": [
+                    {"id": "dns-1", "name": "AdGuard", "protocol": "icmp_ping", "host": "192.168.1.2"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    get_config_manager().reload(emit_event=False)
+
+    store = StateStore(isolated_env["db_path"])
+    await store.initialize()
+    await store.upsert_service_state(
+        "dns-1",
+        service_name="AdGuard",
+        current_status="up",
+        consecutive_failures=0,
+        last_check_at="2026-11-18T12:00:00Z",
+        last_transition_at=None,
+        last_alert_at=None,
+        muted_until=None,
+        last_error=None,
+        last_latency_ms=14,
+    )
+
+    app = _build_test_app()
+    app.include_router(metrics_router.router)
+    app.state.state_store = store
+
+    try:
+        assert (await _asgi_request(app, "GET", "/metrics")).status_code == 401
+        r_metrics = await _asgi_request(
+            app, "GET", "/metrics", headers={"Authorization": f"Bearer {view_tok}"}
+        )
+        assert r_metrics.status_code == 200
+        assert "pve_center_up 1" in r_metrics.text
+        assert 'pve_custom_service_up{service_id="dns-1",protocol="icmp_ping"} 1' in r_metrics.text
+        assert 'pve_custom_service_latency_ms{service_id="dns-1",protocol="icmp_ping"} 14' in r_metrics.text
+        assert "pve_incidents_active_total 0" in r_metrics.text
+
+        r_api = await _asgi_request(
+            app, "GET", "/api/metrics/prometheus", headers={"Authorization": f"Bearer {view_tok}"}
+        )
+        assert r_api.status_code == 200
+        assert "pve_center_up 1" in r_api.text
+    finally:
+        await store.close()
+
 

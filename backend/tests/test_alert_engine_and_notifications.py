@@ -32,11 +32,9 @@ from app.config_schema import (
 )
 from app.services.alert_engine import AlertEngine
 from app.services.connectors import (
-    ConnectorResult,
     http_rest,
     icmp_ping,
     json_metrics,
-    run_connector,
     tcp_port,
     webhook_ingest,
 )

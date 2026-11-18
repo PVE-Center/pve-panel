@@ -21,6 +21,7 @@ from app.routers import (
     custom_services,
     discovery,
     incidents,
+    metrics,
     notifications,
     operations,
     pairing,
@@ -41,7 +42,6 @@ from app.services.state_store import StateStore
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage HTTP clients, SQLite state store, ConfigManager watcher, mDNS, and AlertEngine."""
-    settings = get_settings()
     config_manager = get_config_manager()
     cfg = config_manager.config
     realtime_bus = get_realtime_bus()
@@ -125,6 +125,7 @@ app.include_router(proxmox.router)
 app.include_router(services.router)
 app.include_router(custom_services.router)
 app.include_router(incidents.router)
+app.include_router(metrics.router)
 app.include_router(notifications.router)
 app.include_router(discovery.router)
 app.include_router(pairing.router)
