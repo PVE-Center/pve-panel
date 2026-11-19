@@ -147,9 +147,11 @@ export function StorageSection({ overview, search }: StorageSectionProps) {
                   <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[11px] font-medium text-cyan-700 dark:text-cyan-300">
                     {pool.drives_count} disques fusionnés
                   </span>
-                  <span className="rounded-md border border-slate-300 bg-white/75 px-2 py-0.5 font-mono text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
-                    {pool.mount}
-                  </span>
+                  {pool.mount && (
+                    <span className="rounded-md border border-slate-300 bg-white/75 px-2 py-0.5 font-mono text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
+                      {pool.mount}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Système de fichiers{' '}
@@ -465,7 +467,10 @@ export function StorageSection({ overview, search }: StorageSectionProps) {
                 ? Math.round((res.disk_used_bytes / res.disk_total_bytes) * 1000) / 10
                 : 0;
             return (
-              <div key={`${res.type}-${res.vmid}`} className="liquid-glass rounded-2xl p-3">
+              <div
+                key={`${res.node || 'node'}-${res.type}-${res.vmid}`}
+                className="liquid-glass rounded-2xl p-3"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="text-slate-400">
@@ -479,6 +484,11 @@ export function StorageSection({ overview, search }: StorageSectionProps) {
                     <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                       {res.name}
                     </span>
+                    {res.node && (overview.cluster_nodes?.length || 0) > 1 && (
+                      <span className="shrink-0 rounded border border-indigo-500/25 bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] text-indigo-700 dark:text-indigo-300">
+                        {res.node}
+                      </span>
+                    )}
                   </div>
                   <span className="shrink-0 font-mono text-xs text-slate-700 dark:text-slate-300">
                     {formatCapacity(res.disk_total_bytes)}

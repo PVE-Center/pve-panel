@@ -36,6 +36,9 @@ proxmox:
   verify_ssl: false
   default_node: "pve"
   panel_self_vmid: 116
+  # Optional subpath under HOST_MNT_ROOT (e.g. /host_mnt/<subpath>) for your MergerFS pool.
+  # Leave empty ("") to auto-detect common pool directories (e.g. pool, pool_medias, mergerfs, storage).
+  mergerfs_pool_subpath: ""
 
 integrations:
   jellyfin:

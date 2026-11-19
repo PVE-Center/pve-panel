@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import {
+  AlertTriangle,
   Box,
   Clock,
   Cpu,
   HardDrive,
+  Layers,
   MemoryStick,
   Monitor,
   Play,
   RotateCw,
+  Server,
   Square,
 } from 'lucide-react';
 import type { PveAction, PveOverview, PveResource } from '../types';
@@ -15,6 +18,8 @@ import type { PveAction, PveOverview, PveResource } from '../types';
 interface ProxmoxSectionProps {
   overview: PveOverview | null;
   search: string;
+  selectedNode: string;
+  onSelectNode: (node: string) => void;
   onRequestAction: (resource: PveResource, action: PveAction) => void;
 }
 
@@ -36,6 +41,8 @@ function progressTone(pct: number): string {
 export function ProxmoxSection({
   overview,
   search,
+  selectedNode,
+  onSelectNode,
   onRequestAction,
 }: ProxmoxSectionProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
@@ -51,6 +58,10 @@ export function ProxmoxSection({
   }
 
   const { node, counts, resources } = overview;
+  const clusterNodes = overview.cluster_nodes || [];
+  const activeNode = selectedNode || overview.selected_node || node.name;
+  const isClusterMode = activeNode === '*' || activeNode === 'all';
+  const isMultiNode = clusterNodes.length > 1;
   const query = search.trim().toLowerCase();
 
   const filteredResources = resources.filter((item) => {
@@ -59,17 +70,19 @@ export function ProxmoxSection({
     return (
       item.name.toLowerCase().includes(query) ||
       String(item.vmid).includes(query) ||
+      (item.node ? item.node.toLowerCase().includes(query) : false) ||
       item.tags.some((t) => t.toLowerCase().includes(query))
     );
   });
 
   const lvmStorage =
-    node.storages.find((s) => s.name === 'local-lvm') || node.storages[0];
+    node.storages.find((s) => s.name === 'local-lvm' || s.name.endsWith(':local-lvm')) ||
+    node.storages[0];
 
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <span
             className={`h-2.5 w-2.5 rounded-full ${
               overview.online
@@ -78,7 +91,9 @@ export function ProxmoxSection({
             }`}
           />
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-800 dark:text-slate-300">
-            Supervision Proxmox VE — Nœud {node.name}
+            {isClusterMode
+              ? `Supervision Proxmox VE — ${node.name}`
+              : `Supervision Proxmox VE — Nœud ${node.name}`}
           </h2>
           {node.pve_version && (
             <span className="rounded-md border border-slate-200 bg-white/75 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
@@ -123,6 +138,70 @@ export function ProxmoxSection({
           </button>
         </div>
       </div>
+
+      {/* Sélecteur de nœuds du cluster Proxmox VE */}
+      {(isMultiNode || isClusterMode) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="liquid-pill flex flex-wrap items-center gap-1.5 rounded-2xl p-1 text-xs sm:rounded-full">
+            <button
+              type="button"
+              onClick={() => onSelectNode('*')}
+              aria-pressed={isClusterMode}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium transition ${
+                isClusterMode
+                  ? 'bg-cyan-500/20 text-cyan-800 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-300" />
+              <span>Tous les nœuds (*)</span>
+            </button>
+            {clusterNodes.map((cn) => {
+              const selected = !isClusterMode && activeNode === cn.name;
+              return (
+                <button
+                  key={cn.name}
+                  type="button"
+                  onClick={() => onSelectNode(cn.name)}
+                  aria-pressed={selected}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium transition ${
+                    selected
+                      ? 'bg-cyan-500/20 text-cyan-800 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      cn.online
+                        ? 'bg-emerald-500 shadow-[0_0_6px_rgba(52,211,153,0.7)]'
+                        : 'bg-rose-500'
+                    }`}
+                  />
+                  <span>{cn.name}</span>
+                  <span className="font-mono text-[11px] opacity-75">
+                    {cn.online ? `${cn.cpu_pct}%` : 'Hors ligne'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bannière d'avertissement si failover automatique actif */}
+      {overview.failover_active && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs text-amber-900 backdrop-blur dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0 flex-1">
+            <span className="font-semibold">Bascule automatique (Failover) activée :</span>{' '}
+            le nœud principal est injoignable. Supervision redirigée automatiquement vers le nœud{' '}
+            <span className="font-mono font-semibold">{overview.selected_node || node.name}</span>.
+          </div>
+        </div>
+      )}
 
       {/* KPIs Nœud Proxmox */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -244,7 +323,7 @@ export function ProxmoxSection({
                 const isRunning = item.status === 'running';
                 return (
                   <tr
-                    key={`${item.type}-${item.vmid}`}
+                    key={`${item.node || 'node'}-${item.type}-${item.vmid}`}
                     className="transition hover:bg-black/[0.02] dark:hover:bg-slate-800/40"
                   >
                     <td className="px-4 py-2.5">
@@ -264,13 +343,19 @@ export function ProxmoxSection({
                           )}
                         </span>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="font-mono text-xs text-slate-500">
                               #{item.vmid}
                             </span>
                             <span className="font-medium text-slate-900 dark:text-slate-100">
                               {item.name}
                             </span>
+                            {(isClusterMode || isMultiNode) && item.node && (
+                              <span className="inline-flex items-center gap-1 rounded border border-indigo-500/25 bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+                                <Server className="h-2.5 w-2.5" />
+                                {item.node}
+                              </span>
+                            )}
                             {item.is_self && (
                               <span className="rounded bg-cyan-500/15 px-1.5 py-0.5 text-[10px] font-medium text-cyan-700 dark:text-cyan-300">
                                 Panel

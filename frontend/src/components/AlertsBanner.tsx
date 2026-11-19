@@ -65,12 +65,14 @@ export function AlertsBanner({
     });
   }
 
-  const lvm = pveOverview?.node.storages.find((s) => s.name === 'local-lvm');
-  if (lvm && lvm.used_pct >= 80) {
+  const highLvm = (pveOverview?.node.storages || []).find(
+    (s) => (s.name === 'local-lvm' || s.name.endsWith(':local-lvm')) && s.used_pct >= 80
+  );
+  if (highLvm) {
     alerts.push({
       id: 'lvm-warn',
-      severity: lvm.used_pct >= 90 ? 'critical' : 'warn',
-      text: `Stockage Proxmox local-lvm à ${lvm.used_pct}%`,
+      severity: highLvm.used_pct >= 90 ? 'critical' : 'warn',
+      text: `Stockage Proxmox ${highLvm.name} à ${highLvm.used_pct}%`,
       tab: 'storage',
     });
   }

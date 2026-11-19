@@ -3,6 +3,7 @@ import type {
   ApiTokenInfo,
   AuthLoginResponse,
   AuthUser,
+  ClusterNode,
   ConfigParsedSummary,
   ConfigSaveResponse,
   ConfigValidateResponse,
@@ -11,8 +12,10 @@ import type {
   CustomServiceTestResponse,
   DiscoveryLanResponse,
   DiscoveryQrResponse,
+  ExternalStorageOverview,
   IncidentItem,
   IncidentsResponse,
+  NodeSummary,
   NotificationChannelsResponse,
   NotificationTestResponse,
   NotificationTestResultItem,
@@ -116,6 +119,13 @@ export function setDemoMode(enabled: boolean): void {
   }
 }
 
+interface DemoNodeProfile {
+  name: string;
+  status: string;
+  online: boolean;
+  summary: NodeSummary;
+}
+
 interface DemoState {
   serverId: string;
   serverName: string;
@@ -124,6 +134,7 @@ interface DemoState {
   tailscaleSsoEnabled: boolean;
   pinConfigured: boolean;
   apiTokens: ApiTokenInfo[];
+  pveNodes: DemoNodeProfile[];
   resources: PveResource[];
   pveTasks: PveTaskItem[];
   seerrRequests: SeerrRequestItem[];
@@ -176,9 +187,92 @@ function createInitialDemoState(): DemoState {
         created_at: oneHourAgo,
       },
     ],
+    pveNodes: [
+      {
+        name: 'pve-node-01',
+        status: 'online',
+        online: true,
+        summary: {
+          name: 'pve-node-01',
+          cpu_pct: 23.8,
+          cpu_model: 'AMD EPYC / Ryzen Pro Virtualization Host',
+          cpu_threads: 16,
+          loadavg: ['1.18', '1.05', '0.94'],
+          mem_used_bytes: Math.round(28.4 * GB),
+          mem_total_bytes: 64 * GB,
+          mem_pct: 44.4,
+          swap_used_bytes: Math.round(0.4 * GB),
+          swap_total_bytes: 8 * GB,
+          rootfs_used_bytes: Math.round(42.6 * GB),
+          rootfs_total_bytes: 120 * GB,
+          uptime_seconds: 1842310,
+          uptime_human: '21j 7h 45m',
+          pve_version: '8.3.2',
+          storages: [
+            {
+              name: 'local-lvm',
+              type: 'lvmthin',
+              active: true,
+              used_bytes: 412 * GB,
+              total_bytes: 1000 * GB,
+              used_pct: 41.2,
+            },
+            {
+              name: 'local',
+              type: 'dir',
+              active: true,
+              used_bytes: 88 * GB,
+              total_bytes: 240 * GB,
+              used_pct: 36.7,
+            },
+          ],
+        },
+      },
+      {
+        name: 'pve-node-02',
+        status: 'online',
+        online: true,
+        summary: {
+          name: 'pve-node-02',
+          cpu_pct: 14.5,
+          cpu_model: 'Intel Xeon E-2388G Virtualization Node',
+          cpu_threads: 12,
+          loadavg: ['0.62', '0.58', '0.51'],
+          mem_used_bytes: Math.round(14.2 * GB),
+          mem_total_bytes: 32 * GB,
+          mem_pct: 44.4,
+          swap_used_bytes: Math.round(0.1 * GB),
+          swap_total_bytes: 4 * GB,
+          rootfs_used_bytes: Math.round(28.0 * GB),
+          rootfs_total_bytes: 100 * GB,
+          uptime_seconds: 1123200,
+          uptime_human: '13j 0h 0m',
+          pve_version: '8.3.2',
+          storages: [
+            {
+              name: 'local-lvm',
+              type: 'lvmthin',
+              active: true,
+              used_bytes: 184 * GB,
+              total_bytes: 500 * GB,
+              used_pct: 36.8,
+            },
+            {
+              name: 'local',
+              type: 'dir',
+              active: true,
+              used_bytes: 44 * GB,
+              total_bytes: 120 * GB,
+              used_pct: 36.7,
+            },
+          ],
+        },
+      },
+    ],
     resources: [
       {
         vmid: 101,
+        node: 'pve-node-01',
         name: 'ct-reverse-proxy',
         type: 'lxc',
         status: 'running',
@@ -196,6 +290,7 @@ function createInitialDemoState(): DemoState {
       },
       {
         vmid: 102,
+        node: 'pve-node-01',
         name: 'ct-media-server',
         type: 'lxc',
         status: 'running',
@@ -213,6 +308,7 @@ function createInitialDemoState(): DemoState {
       },
       {
         vmid: 103,
+        node: 'pve-node-02',
         name: 'vm-docker-host',
         type: 'qemu',
         status: 'running',
@@ -230,6 +326,7 @@ function createInitialDemoState(): DemoState {
       },
       {
         vmid: 104,
+        node: 'pve-node-02',
         name: 'ct-backup-node',
         type: 'lxc',
         status: 'stopped',
@@ -246,7 +343,26 @@ function createInitialDemoState(): DemoState {
         is_self: false,
       },
       {
+        vmid: 105,
+        node: 'pve-node-02',
+        name: 'ct-observability',
+        type: 'lxc',
+        status: 'running',
+        cpu_pct: 6.4,
+        cpus: 2,
+        mem_used_bytes: Math.round(1.4 * GB),
+        mem_total_bytes: 4 * GB,
+        mem_pct: 35.0,
+        disk_used_bytes: Math.round(6.2 * GB),
+        disk_total_bytes: 24 * GB,
+        uptime_seconds: 1123200,
+        uptime_human: '13j 0h',
+        tags: ['metrics', 'prometheus'],
+        is_self: false,
+      },
+      {
         vmid: 116,
+        node: 'pve-node-01',
         name: 'pve-panel',
         type: 'lxc',
         status: 'running',
@@ -1081,131 +1197,232 @@ async function handleDemoRequest(apiPath: string, init?: RequestInit): Promise<R
     return jsonResponse(resp);
   }
 
+  if (path === '/api/pve/nodes' && method === 'GET') {
+    const nodes: ClusterNode[] = demoState.pveNodes.map((n) => ({
+      name: n.name,
+      status: n.status,
+      online: n.online,
+      cpu_pct: n.summary.cpu_pct,
+      cpus: n.summary.cpu_threads,
+      mem_used_bytes: n.summary.mem_used_bytes,
+      mem_total_bytes: n.summary.mem_total_bytes,
+      mem_pct: n.summary.mem_pct,
+      uptime_seconds: n.summary.uptime_seconds,
+      uptime_human: n.summary.uptime_human,
+    }));
+    return jsonResponse({ nodes, default_node: demoState.setupEnv.pve_node });
+  }
+
   if (path === '/api/pve/overview' && method === 'GET') {
-    const running = demoState.resources.filter((r) => r.status === 'running').length;
-    const stopped = demoState.resources.length - running;
-    const lxcCount = demoState.resources.filter((r) => r.type === 'lxc').length;
-    const qemuCount = demoState.resources.filter((r) => r.type === 'qemu').length;
+    const reqNode = (url.searchParams.get('node') || '').trim();
+    const clusterNodes: ClusterNode[] = demoState.pveNodes.map((n) => ({
+      name: n.name,
+      status: n.status,
+      online: n.online,
+      cpu_pct: n.summary.cpu_pct,
+      cpus: n.summary.cpu_threads,
+      mem_used_bytes: n.summary.mem_used_bytes,
+      mem_total_bytes: n.summary.mem_total_bytes,
+      mem_pct: n.summary.mem_pct,
+      uptime_seconds: n.summary.uptime_seconds,
+      uptime_human: n.summary.uptime_human,
+    }));
+
+    const externalStorage: ExternalStorageOverview = {
+      pool: {
+        name: 'Pool MergerFS (32 To)',
+        mount: '/mnt/pool',
+        fstype: 'fuse.mergerfs',
+        policy: 'mfs (most free space)',
+        drives_count: 3,
+        available: true,
+        total_bytes: 32 * TB,
+        used_bytes: Math.round(19.6 * TB),
+        avail_bytes: Math.round(12.4 * TB),
+        used_pct: 61.3,
+      },
+      drives: [
+        {
+          mount: '/mnt/disk1',
+          label: 'Disque 1 • 16 To',
+          wwn: 'wwn-0x5000demo00000001',
+          devpath: '/dev/sda',
+          model: 'Seagate IronWolf Pro 16TB',
+          vendor: 'ATA',
+          serial: 'DEMO-16TB-01',
+          type: 'HDD',
+          rpm: '7200 rpm',
+          health: 'PASSED',
+          size_bytes: 16 * TB,
+          total_bytes: 16 * TB,
+          used_bytes: Math.round(10.1 * TB),
+          avail_bytes: Math.round(5.9 * TB),
+          used_pct: 63.1,
+        },
+        {
+          mount: '/mnt/disk2',
+          label: 'Disque 2 • 16 To',
+          wwn: 'wwn-0x5000demo00000002',
+          devpath: '/dev/sdb',
+          model: 'Seagate IronWolf Pro 16TB',
+          vendor: 'ATA',
+          serial: 'DEMO-16TB-02',
+          type: 'HDD',
+          rpm: '7200 rpm',
+          health: 'PASSED',
+          size_bytes: 16 * TB,
+          total_bytes: 16 * TB,
+          used_bytes: Math.round(9.5 * TB),
+          avail_bytes: Math.round(6.5 * TB),
+          used_pct: 59.4,
+        },
+        {
+          mount: '/mnt/disk3',
+          label: 'Cache NVMe • 2 To',
+          wwn: 'wwn-0x5000demo00000003',
+          devpath: '/dev/nvme0n1',
+          model: 'Samsung 990 PRO 2TB',
+          vendor: 'NVMe',
+          serial: 'DEMO-NVME-01',
+          type: 'SSD',
+          rpm: 'NVMe',
+          health: 'PASSED',
+          size_bytes: 2 * TB,
+          total_bytes: 2 * TB,
+          used_bytes: Math.round(0.84 * TB),
+          avail_bytes: Math.round(1.16 * TB),
+          used_pct: 42.0,
+        },
+      ],
+      system_ssd: {
+        devpath: '/dev/nvme1n1',
+        model: 'Enterprise Boot NVMe 512GB',
+        serial: 'DEMO-SYS-01',
+        health: 'PASSED',
+        size_bytes: 512 * GB,
+      },
+    };
+
+    if (reqNode === '*' || reqNode === 'all') {
+      const onlineNodes = demoState.pveNodes.filter((n) => n.online);
+      const memUsed = demoState.pveNodes.reduce((sum, n) => sum + n.summary.mem_used_bytes, 0);
+      const memTotal =
+        demoState.pveNodes.reduce((sum, n) => sum + n.summary.mem_total_bytes, 0) || 1;
+      const swapUsed = demoState.pveNodes.reduce((sum, n) => sum + n.summary.swap_used_bytes, 0);
+      const swapTotal = demoState.pveNodes.reduce((sum, n) => sum + n.summary.swap_total_bytes, 0);
+      const rootUsed = demoState.pveNodes.reduce((sum, n) => sum + n.summary.rootfs_used_bytes, 0);
+      const rootTotal = demoState.pveNodes.reduce((sum, n) => sum + n.summary.rootfs_total_bytes, 0);
+      const totalThreads = demoState.pveNodes.reduce((sum, n) => sum + n.summary.cpu_threads, 0);
+      const avgCpu =
+        onlineNodes.length > 0
+          ? Math.round(
+              (onlineNodes.reduce((sum, n) => sum + n.summary.cpu_pct, 0) / onlineNodes.length) * 10
+            ) / 10
+          : 0;
+      const combinedStorages = demoState.pveNodes.flatMap((n) =>
+        n.summary.storages.map((st) => ({
+          ...st,
+          node: n.name,
+          name: `${n.name}:${st.name}`,
+        }))
+      );
+      const resources = [...demoState.resources].sort(
+        (a, b) => a.vmid - b.vmid || (a.node || '').localeCompare(b.node || '')
+      );
+      const running = resources.filter((r) => r.status === 'running').length;
+      const baseSummary = (onlineNodes[0] || demoState.pveNodes[0]).summary;
+
+      const clusterOverview: PveOverview = {
+        online: onlineNodes.length > 0,
+        selected_node: reqNode,
+        failover_active: false,
+        cluster_nodes: clusterNodes,
+        node: {
+          name: `Cluster (${demoState.pveNodes.length} nœuds)`,
+          cpu_pct: avgCpu,
+          cpu_model: baseSummary.cpu_model,
+          cpu_threads: totalThreads,
+          loadavg: baseSummary.loadavg,
+          mem_used_bytes: memUsed,
+          mem_total_bytes: memTotal,
+          mem_pct: Math.round((memUsed / memTotal) * 1000) / 10,
+          swap_used_bytes: swapUsed,
+          swap_total_bytes: swapTotal,
+          rootfs_used_bytes: rootUsed,
+          rootfs_total_bytes: rootTotal,
+          uptime_seconds: Math.max(...demoState.pveNodes.map((n) => n.summary.uptime_seconds), 0),
+          uptime_human: baseSummary.uptime_human,
+          pve_version: baseSummary.pve_version,
+          storages: combinedStorages,
+        },
+        counts: {
+          total: resources.length,
+          running,
+          stopped: resources.length - running,
+          lxc: resources.filter((r) => r.type === 'lxc').length,
+          qemu: resources.filter((r) => r.type === 'qemu').length,
+        },
+        resources,
+        external_storage: externalStorage,
+      };
+      return jsonResponse(clusterOverview);
+    }
+
+    const targetProfile = reqNode
+      ? demoState.pveNodes.find((n) => n.name === reqNode)
+      : demoState.pveNodes.find((n) => n.name === demoState.setupEnv.pve_node) ||
+        demoState.pveNodes[0];
+
+    if (!targetProfile) {
+      const missingOverview: PveOverview = {
+        online: false,
+        selected_node: reqNode,
+        failover_active: false,
+        cluster_nodes: clusterNodes,
+        node: {
+          name: reqNode,
+          cpu_pct: 0,
+          cpu_model: 'Inconnu',
+          cpu_threads: 0,
+          loadavg: ['0.00', '0.00', '0.00'],
+          mem_used_bytes: 0,
+          mem_total_bytes: 1,
+          mem_pct: 0,
+          swap_used_bytes: 0,
+          swap_total_bytes: 0,
+          rootfs_used_bytes: 0,
+          rootfs_total_bytes: 0,
+          uptime_seconds: 0,
+          uptime_human: '—',
+          pve_version: '',
+          storages: [],
+        },
+        counts: { total: 0, running: 0, stopped: 0, lxc: 0, qemu: 0 },
+        resources: [],
+        external_storage: externalStorage,
+      };
+      return jsonResponse(missingOverview);
+    }
+
+    const nodeResources = demoState.resources.filter((r) => r.node === targetProfile.name);
+    const running = nodeResources.filter((r) => r.status === 'running').length;
+    const stopped = nodeResources.length - running;
 
     const overview: PveOverview = {
-      online: true,
-      node: {
-        name: 'pve-node-01',
-        cpu_pct: 23.8,
-        cpu_model: 'AMD EPYC / Ryzen Pro Virtualization Host',
-        cpu_threads: 16,
-        loadavg: ['1.18', '1.05', '0.94'],
-        mem_used_bytes: Math.round(28.4 * GB),
-        mem_total_bytes: 64 * GB,
-        mem_pct: 44.4,
-        swap_used_bytes: Math.round(0.4 * GB),
-        swap_total_bytes: 8 * GB,
-        rootfs_used_bytes: Math.round(42.6 * GB),
-        rootfs_total_bytes: 120 * GB,
-        uptime_seconds: 1842310,
-        uptime_human: '21j 7h 45m',
-        pve_version: '8.3.2',
-        storages: [
-          {
-            name: 'local-lvm',
-            type: 'lvmthin',
-            active: true,
-            used_bytes: 412 * GB,
-            total_bytes: 1000 * GB,
-            used_pct: 41.2,
-          },
-          {
-            name: 'local',
-            type: 'dir',
-            active: true,
-            used_bytes: 88 * GB,
-            total_bytes: 240 * GB,
-            used_pct: 36.7,
-          },
-        ],
-      },
+      online: targetProfile.online,
+      selected_node: targetProfile.name,
+      failover_active: false,
+      cluster_nodes: clusterNodes,
+      node: targetProfile.summary,
       counts: {
-        total: demoState.resources.length,
+        total: nodeResources.length,
         running,
         stopped,
-        lxc: lxcCount,
-        qemu: qemuCount,
+        lxc: nodeResources.filter((r) => r.type === 'lxc').length,
+        qemu: nodeResources.filter((r) => r.type === 'qemu').length,
       },
-      resources: demoState.resources,
-      external_storage: {
-        pool: {
-          name: 'Pool MergerFS (32 To)',
-          mount: '/mnt/storage',
-          fstype: 'fuse.mergerfs',
-          policy: 'mfs (most free space)',
-          drives_count: 3,
-          available: true,
-          total_bytes: 32 * TB,
-          used_bytes: Math.round(19.6 * TB),
-          avail_bytes: Math.round(12.4 * TB),
-          used_pct: 61.3,
-        },
-        drives: [
-          {
-            mount: '/mnt/disk1',
-            label: 'Disque 1 • 16 To',
-            wwn: 'wwn-0x5000demo00000001',
-            devpath: '/dev/sda',
-            model: 'Seagate IronWolf Pro 16TB',
-            vendor: 'ATA',
-            serial: 'DEMO-16TB-01',
-            type: 'HDD',
-            rpm: '7200 rpm',
-            health: 'PASSED',
-            size_bytes: 16 * TB,
-            total_bytes: 16 * TB,
-            used_bytes: Math.round(10.1 * TB),
-            avail_bytes: Math.round(5.9 * TB),
-            used_pct: 63.1,
-          },
-          {
-            mount: '/mnt/disk2',
-            label: 'Disque 2 • 16 To',
-            wwn: 'wwn-0x5000demo00000002',
-            devpath: '/dev/sdb',
-            model: 'Seagate IronWolf Pro 16TB',
-            vendor: 'ATA',
-            serial: 'DEMO-16TB-02',
-            type: 'HDD',
-            rpm: '7200 rpm',
-            health: 'PASSED',
-            size_bytes: 16 * TB,
-            total_bytes: 16 * TB,
-            used_bytes: Math.round(9.5 * TB),
-            avail_bytes: Math.round(6.5 * TB),
-            used_pct: 59.4,
-          },
-          {
-            mount: '/mnt/disk3',
-            label: 'Cache NVMe • 2 To',
-            wwn: 'wwn-0x5000demo00000003',
-            devpath: '/dev/nvme0n1',
-            model: 'Samsung 990 PRO 2TB',
-            vendor: 'NVMe',
-            serial: 'DEMO-NVME-01',
-            type: 'SSD',
-            rpm: 'NVMe',
-            health: 'PASSED',
-            size_bytes: 2 * TB,
-            total_bytes: 2 * TB,
-            used_bytes: Math.round(0.84 * TB),
-            avail_bytes: Math.round(1.16 * TB),
-            used_pct: 42.0,
-          },
-        ],
-        system_ssd: {
-          devpath: '/dev/nvme1n1',
-          model: 'Enterprise Boot NVMe 512GB',
-          serial: 'DEMO-SYS-01',
-          health: 'PASSED',
-          size_bytes: 512 * GB,
-        },
-      },
+      resources: nodeResources,
+      external_storage: externalStorage,
     };
     return jsonResponse(overview);
   }
@@ -1214,9 +1431,23 @@ async function handleDemoRequest(apiPath: string, init?: RequestInit): Promise<R
   if (pveMatch && method === 'POST') {
     const [, type, vmidStr, action] = pveMatch;
     const vmid = Number(vmidStr);
-    const target = demoState.resources.find((r) => r.vmid === vmid && r.type === type);
+    const reqNode = (url.searchParams.get('node') || '').trim();
+    const target = demoState.resources.find(
+      (r) => r.vmid === vmid && r.type === type && (!reqNode || r.node === reqNode)
+    );
     if (!target) {
       return jsonResponse({ detail: 'Ressource introuvable en mode démo' }, 404);
+    }
+    if (
+      vmid === demoState.setupEnv.panel_self_vmid &&
+      (action === 'stop' || action === 'shutdown')
+    ) {
+      return jsonResponse(
+        {
+          detail: `Protection activée : impossible d'arrêter le conteneur du panel (${vmid}).`,
+        },
+        400
+      );
     }
     if (action === 'stop' || action === 'shutdown') {
       target.status = 'stopped';
@@ -1233,9 +1464,10 @@ async function handleDemoRequest(apiPath: string, init?: RequestInit): Promise<R
       target.uptime_seconds = 60;
       target.uptime_human = '1m';
     }
+    const targetNode = target.node || reqNode || demoState.setupEnv.pve_node || 'pve-node-01';
     const nowSec = Math.floor(Date.now() / 1000);
     demoState.pveTasks.unshift({
-      upid: `UPID:pve-node-01:demo-${action}-${vmid}-${Date.now()}`,
+      upid: `UPID:${targetNode}:demo-${action}-${vmid}-${Date.now()}`,
       type: `${type === 'lxc' ? 'vz' : 'qm'}${action}`,
       vmid: String(vmid),
       user: 'demo@pve',
@@ -1244,7 +1476,7 @@ async function handleDemoRequest(apiPath: string, init?: RequestInit): Promise<R
       endtime: nowSec + 1,
       duration_sec: 1,
     });
-    return jsonResponse({ ok: true, vmid, type, action, upid: 'demo-task-ok' });
+    return jsonResponse({ ok: true, node: targetNode, vmid, type, action, upid: 'demo-task-ok' });
   }
 
   if (path === '/api/services' && method === 'GET') {

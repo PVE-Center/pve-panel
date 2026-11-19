@@ -626,6 +626,7 @@ class ConfigManager:
                 "verify_ssl": _parse_bool(env_lookup.get("PVE_VERIFY_SSL"), False),
                 "default_node": env_lookup.get("PVE_NODE", "pve") or "pve",
                 "panel_self_vmid": _parse_int(env_lookup.get("PANEL_SELF_VMID"), 116),
+                "mergerfs_pool_subpath": env_lookup.get("MERGERFS_POOL_SUBPATH", ""),
             },
             "integrations": {
                 "jellyfin": {

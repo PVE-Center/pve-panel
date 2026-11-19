@@ -69,7 +69,10 @@ export function ConfirmModal({
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                 {meta.label} {resource.type.toUpperCase()} {resource.vmid}
               </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{resource.name}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {resource.name}
+                {resource.node ? ` • ${resource.node}` : ''}
+              </p>
             </div>
           </div>
           <button

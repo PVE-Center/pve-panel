@@ -94,6 +94,7 @@ def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "PVE_NODE",
         "PVE_TOKEN_ID",
         "PVE_TOKEN_SECRET",
+        "MERGERFS_POOL_SUBPATH",
         "DEV_AUTH_BYPASS",
         "ALLOWED_TAILSCALE_USERS",
         "TAILSCALE_SSO_ENABLED",
@@ -140,6 +141,7 @@ def test_config_example_yaml_is_valid() -> None:
     cfg, errors, _warnings = validate_app_config(parsed)
     assert errors == []
     assert cfg is not None
+    assert cfg.proxmox.mergerfs_pool_subpath == ""
     assert len(cfg.custom_services) >= 1
     assert len(cfg.notifications.webhooks) >= 1
 
@@ -1137,5 +1139,103 @@ async def test_prometheus_metrics_endpoints_and_auth(isolated_env) -> None:
         assert "pve_center_up 1" in r_api.text
     finally:
         await store.close()
+
+
+def test_mergerfs_pool_subpath_config_and_autodetect(
+    isolated_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import pve_client
+    from app.services.pve_client import ProxmoxClient
+
+    tmp_path: Path = isolated_env["tmp_path"]
+    cfg_path: Path = isolated_env["config_path"]
+    env_path: Path = isolated_env["env_path"]
+
+    host_mnt = tmp_path / "host_mnt"
+    host_mnt.mkdir()
+    monkeypatch.setattr(pve_client, "HOST_MNT_ROOT", host_mnt)
+    monkeypatch.setattr(pve_client, "PROC_MOUNTS_PATH", tmp_path / "no_proc_mounts")
+
+    # 1. Disks only (no MergerFS pool directory) -> available=False and all disks returned
+    (host_mnt / "disk1").mkdir()
+    (host_mnt / "disk2").mkdir()
+    ext_disks_only = ProxmoxClient._build_external_storage([])
+    assert ext_disks_only["pool"]["available"] is False
+    assert ext_disks_only["pool"]["mount"] == ""
+    assert ext_disks_only["pool"]["drives_count"] == 2
+    assert [d["mount"] for d in ext_disks_only["drives"]] == ["/mnt/disk1", "/mnt/disk2"]
+
+    # 2. Auto-detect generic pool name ("pool") and exclude it from physical drives
+    (host_mnt / "pool").mkdir()
+    ext_pool = ProxmoxClient._build_external_storage([])
+    assert ext_pool["pool"]["available"] is True
+    assert ext_pool["pool"]["mount"] == "/mnt/pool"
+    assert ext_pool["pool"]["drives_count"] == 2
+    assert [d["mount"] for d in ext_pool["drives"]] == ["/mnt/disk1", "/mnt/disk2"]
+
+    # 3. Auto-detect arbitrary non-disk directory when no common pool name exists
+    (host_mnt / "pool").rmdir()
+    (host_mnt / "media_vault").mkdir()
+    ext_non_disk = ProxmoxClient._build_external_storage([])
+    assert ext_non_disk["pool"]["available"] is True
+    assert ext_non_disk["pool"]["mount"] == "/mnt/media_vault"
+    assert [d["mount"] for d in ext_non_disk["drives"]] == ["/mnt/disk1", "/mnt/disk2"]
+
+    # 4. /proc/mounts fuse.mergerfs detection takes priority over directory guessing
+    (host_mnt / "proc_array").mkdir()
+    fake_proc_mounts = tmp_path / "proc_mounts"
+    fake_proc_mounts.write_text(
+        f"disk1:disk2 {host_mnt / 'proc_array'} fuse.mergerfs rw,relatime 0 0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(pve_client, "PROC_MOUNTS_PATH", fake_proc_mounts)
+    ext_proc = ProxmoxClient._build_external_storage([])
+    assert ext_proc["pool"]["available"] is True
+    assert ext_proc["pool"]["mount"] == "/mnt/proc_array"
+    assert [d["mount"] for d in ext_proc["drives"]] == [
+        "/mnt/disk1",
+        "/mnt/disk2",
+        "/mnt/media_vault",
+    ]
+
+    # 5. MERGERFS_POOL_SUBPATH in .env (synthesized mode) overrides auto-detection
+    (host_mnt / "custom_env_pool").mkdir()
+    env_path.write_text("MERGERFS_POOL_SUBPATH=/custom_env_pool/\n", encoding="utf-8")
+    reload_settings()
+    assert get_settings().mergerfs_pool_subpath == "custom_env_pool"
+    ext_env = ProxmoxClient._build_external_storage([])
+    assert ext_env["pool"]["available"] is True
+    assert ext_env["pool"]["mount"] == "/mnt/custom_env_pool"
+    assert "/mnt/custom_env_pool" not in [d["mount"] for d in ext_env["drives"]]
+
+    # 6. Declarative config.yaml proxmox.mergerfs_pool_subpath + traversal sanitization
+    (host_mnt / "yaml_pool").mkdir()
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "proxmox": {
+                    "host": "https://pve.local:8006",
+                    "mergerfs_pool_subpath": "/yaml_pool/",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    reload_settings()
+    assert get_settings().mergerfs_pool_subpath == "yaml_pool"
+    ext_yaml = ProxmoxClient._build_external_storage([])
+    assert ext_yaml["pool"]["available"] is True
+    assert ext_yaml["pool"]["mount"] == "/mnt/yaml_pool"
+    assert "/mnt/yaml_pool" not in [d["mount"] for d in ext_yaml["drives"]]
+
+    # Traversal attempt normalizes to empty string
+    cfg_ok, errs, _ = validate_app_config(
+        {"version": 1, "proxmox": {"mergerfs_pool_subpath": "../etc/passwd"}}
+    )
+    assert errs == []
+    assert cfg_ok is not None
+    assert cfg_ok.proxmox.mergerfs_pool_subpath == ""
+
 
 

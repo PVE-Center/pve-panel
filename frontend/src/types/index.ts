@@ -29,6 +29,25 @@ export interface StorageInfo {
   used_bytes: number;
   total_bytes: number;
   used_pct: number;
+  node?: string;
+}
+
+export interface ClusterNode {
+  name: string;
+  status: string;
+  online: boolean;
+  cpu_pct: number;
+  cpus: number;
+  mem_used_bytes: number;
+  mem_total_bytes: number;
+  mem_pct: number;
+  uptime_seconds: number;
+  uptime_human: string;
+}
+
+export interface PveNodesResponse {
+  nodes: ClusterNode[];
+  default_node: string;
 }
 
 export interface NodeSummary {
@@ -52,6 +71,7 @@ export interface NodeSummary {
 
 export interface PveResource {
   vmid: number;
+  node?: string;
   name: string;
   type: 'lxc' | 'qemu';
   status: string;
@@ -115,6 +135,9 @@ export interface ExternalStorageOverview {
 
 export interface PveOverview {
   online: boolean;
+  selected_node?: string;
+  failover_active?: boolean;
+  cluster_nodes?: ClusterNode[];
   node: NodeSummary;
   counts: {
     total: number;
@@ -630,6 +653,7 @@ export interface SetupEnvConfig {
   pve_token_secret_set: boolean;
   pve_verify_ssl: boolean;
   panel_self_vmid: number;
+  mergerfs_pool_subpath?: string;
   jellyfin_url: string;
   jellyfin_api_key_set: boolean;
   jellyseerr_url: string;

@@ -75,6 +75,7 @@ export function App() {
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('all');
+  const [selectedNode, setSelectedNode] = useState<string>('');
   const [search, setSearch] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -104,6 +105,9 @@ export function App() {
 
   const hasLoadedOnceRef = useRef(false);
   const autoPromptedOnboardingRef = useRef(false);
+  const selectedNodeRef = useRef(selectedNode);
+  selectedNodeRef.current = selectedNode;
+  const pveReqIdRef = useRef(0);
 
   const [pendingAction, setPendingAction] = useState<{
     resource: PveResource;
@@ -217,9 +221,15 @@ export function App() {
       const currentUser = (await meResp.json()) as AuthUser;
       setUser(currentUser);
 
+      const pveReqId = ++pveReqIdRef.current;
+      const targetNode = selectedNodeRef.current;
+      const pveOverviewUrl = targetNode
+        ? `/api/pve/overview?node=${encodeURIComponent(targetNode)}`
+        : '/api/pve/overview';
+
       const [pveResp, svcResp, csResp, widResp, usrResp, opsResp, incResp, setupResp] =
         await Promise.all([
-          fetch('/api/pve/overview'),
+          fetch(pveOverviewUrl),
           fetch('/api/services'),
           fetch('/api/custom-services'),
           fetch('/api/widgets/all'),
@@ -229,7 +239,9 @@ export function App() {
           fetch('/api/setup/status'),
         ]);
 
-      if (pveResp.ok) setPveOverview(await pveResp.json());
+      if (pveResp.ok && pveReqId === pveReqIdRef.current) {
+        setPveOverview(await pveResp.json());
+      }
       if (svcResp.ok) {
         const svcData = await svcResp.json();
         setCategories(svcData.categories || []);
@@ -395,13 +407,32 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const handleSelectNode = useCallback(async (nextNode: string) => {
+    setSelectedNode(nextNode);
+    selectedNodeRef.current = nextNode;
+    const pveReqId = ++pveReqIdRef.current;
+    const queryStr = nextNode ? `?node=${encodeURIComponent(nextNode)}` : '';
+    try {
+      const resp = await fetch(`/api/pve/overview${queryStr}`);
+      if (resp.ok && pveReqId === pveReqIdRef.current) {
+        setPveOverview(await resp.json());
+      }
+    } catch {
+      // Next periodic refresh will retry
+    }
+  }, []);
+
   const handleConfirmAction = async () => {
     if (!pendingAction) return;
     setActionBusy(true);
     const { resource, action } = pendingAction;
+    const targetNode =
+      resource.node ||
+      (selectedNode && selectedNode !== '*' && selectedNode !== 'all' ? selectedNode : '');
+    const nodeQuery = targetNode ? `?node=${encodeURIComponent(targetNode)}` : '';
     try {
       const resp = await fetch(
-        `/api/pve/${resource.type}/${resource.vmid}/${action}`,
+        `/api/pve/${resource.type}/${resource.vmid}/${action}${nodeQuery}`,
         { method: 'POST' }
       );
       const data = await resp.json().catch(() => ({}));
@@ -603,7 +634,7 @@ export function App() {
   const poolBadge =
     pool && pool.total_bytes > 0
       ? `${(pool.total_bytes / 1e12).toFixed(1)} To • ${pool.used_pct}%`
-      : '16 To';
+      : undefined;
 
   const pendingSeerrCount = (opsOverview?.seerr_requests || []).filter(
     (r) => r.status === 1
@@ -786,6 +817,8 @@ export function App() {
           <ProxmoxSection
             overview={pveOverview}
             search={search}
+            selectedNode={selectedNode}
+            onSelectNode={(nextNode) => void handleSelectNode(nextNode)}
             onRequestAction={(resource, action) =>
               setPendingAction({ resource, action })
             }
@@ -970,6 +1003,8 @@ export function App() {
           setServerModalOpen(false);
           setAuthModalOpen(false);
           setAuthError(null);
+          setSelectedNode('');
+          selectedNodeRef.current = '';
           hasLoadedOnceRef.current = false;
           autoPromptedOnboardingRef.current = false;
           void fetchAllData();

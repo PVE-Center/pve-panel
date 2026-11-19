@@ -3,6 +3,7 @@
 import asyncio
 import os
 from pathlib import Path
+import re
 from typing import Any, Literal
 
 import httpx
@@ -10,18 +11,144 @@ import httpx
 from app.config import get_settings, load_storage_mounts_config
 
 HOST_MNT_ROOT = Path(os.environ.get("HOST_MNT_ROOT", "/host_mnt"))
+PROC_MOUNTS_PATH = Path("/proc/mounts")
+
+_COMMON_MERGERFS_POOL_NAMES: tuple[str, ...] = (
+    "pool_medias",
+    "pool",
+    "mergerfs",
+    "media_pool",
+    "pool_media",
+    "storage",
+    "union",
+)
+_DISK_DIR_NAME_RE = re.compile(
+    r"^(?:(?:disk|drive|hdd|ssd|nvme|disque|sd[a-z]|hd[a-z]|vd[a-z])[a-z0-9_-]*|(?:vol|volume|bay|slot|data)[-_]?\d+)$",
+    re.IGNORECASE,
+)
+_IGNORED_MNT_DIRS = frozenset({"lost+found"})
 
 
-def _resolve_disk_mounts() -> list[dict[str, str]]:
-    """Load storage mounts from services.yaml or auto-discover subdirectories under /host_mnt."""
-    configured = load_storage_mounts_config()
+def _normalize_subpath(raw: str) -> str:
+    """Normalize a relative mount subpath while rejecting traversal segments."""
+    cleaned = raw.strip().strip("/")
+    parts = [p for p in cleaned.split("/") if p]
+    if not parts or any(p in (".", "..") for p in parts):
+        return ""
+    return "/".join(parts)
+
+
+def _detect_mergerfs_from_proc_mounts(
+    root: Path,
+    excluded_subpaths: set[str],
+    proc_mounts_path: Path | None = None,
+) -> str:
+    """Inspect proc mounts for an active fuse.mergerfs mount located under HOST_MNT_ROOT."""
+    mounts_file = proc_mounts_path or PROC_MOUNTS_PATH
+    if not mounts_file.is_file():
+        return ""
+    try:
+        root_resolved = root.resolve()
+        lines = mounts_file.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        mountpoint_raw, fstype = parts[1], parts[2].lower()
+        if "mergerfs" not in fstype:
+            continue
+        mount_path = Path(mountpoint_raw.replace("\\040", " "))
+        for base in (root, root_resolved):
+            try:
+                rel = mount_path.relative_to(base)
+            except ValueError:
+                continue
+            rel_str = _normalize_subpath(rel.as_posix())
+            if rel_str and rel_str not in excluded_subpaths:
+                return rel_str
+    return ""
+
+
+def _resolve_mergerfs_pool_subpath() -> str:
+    """Resolve the active MergerFS pool subpath from config/env or auto-detect under HOST_MNT_ROOT."""
+    configured = _normalize_subpath(get_settings().mergerfs_pool_subpath)
     if configured:
         return configured
+
+    configured_disk_subpaths = {
+        _normalize_subpath(m.get("subpath", ""))
+        for m in load_storage_mounts_config()
+        if m.get("subpath")
+    }
+    configured_disk_subpaths.discard("")
+
+    from_proc = _detect_mergerfs_from_proc_mounts(HOST_MNT_ROOT, configured_disk_subpaths)
+    if from_proc:
+        return from_proc
+
+    if not HOST_MNT_ROOT.is_dir():
+        return ""
+
+    candidates = [
+        entry.name
+        for entry in sorted(HOST_MNT_ROOT.iterdir(), key=lambda p: p.name)
+        if entry.is_dir()
+        and not entry.name.startswith(".")
+        and entry.name.lower() not in _IGNORED_MNT_DIRS
+        and entry.name not in configured_disk_subpaths
+    ]
+    if not candidates:
+        return ""
+
+    by_lower = {name.lower(): name for name in candidates}
+    for common_name in _COMMON_MERGERFS_POOL_NAMES:
+        if common_name in by_lower:
+            return by_lower[common_name]
+
+    for name in candidates:
+        lower = name.lower()
+        if "pool" in lower or "mergerfs" in lower:
+            return name
+
+    for name in candidates:
+        if not _DISK_DIR_NAME_RE.match(name):
+            return name
+
+    return ""
+
+
+def _resolve_disk_mounts(pool_subpath: str | None = None) -> list[dict[str, str]]:
+    """Load configured storage mounts or auto-discover physical disk subdirectories under HOST_MNT_ROOT."""
+    active_pool = (
+        _resolve_mergerfs_pool_subpath()
+        if pool_subpath is None
+        else _normalize_subpath(pool_subpath)
+    )
+    pool_top_dir = active_pool.split("/", 1)[0] if active_pool else ""
+
+    configured = load_storage_mounts_config()
+    if configured:
+        if not active_pool:
+            return configured
+        return [
+            m
+            for m in configured
+            if _normalize_subpath(m.get("subpath", "")) != active_pool
+        ]
+
     if not HOST_MNT_ROOT.is_dir():
         return []
     discovered: list[dict[str, str]] = []
     for entry in sorted(HOST_MNT_ROOT.iterdir(), key=lambda p: p.name):
-        if entry.is_dir() and entry.name != "pool_medias":
+        if (
+            entry.is_dir()
+            and not entry.name.startswith(".")
+            and entry.name.lower() not in _IGNORED_MNT_DIRS
+            and entry.name != pool_top_dir
+        ):
             discovered.append(
                 {
                     "mount": f"/mnt/{entry.name}",
@@ -330,20 +457,24 @@ class ProxmoxClient:
             if isinstance(d, dict) and d.get("wwn")
         }
 
-        pool_stats = _statvfs_usage(HOST_MNT_ROOT / "pool_medias") or {
+        pool_subpath = _resolve_mergerfs_pool_subpath()
+        pool_path = (HOST_MNT_ROOT / pool_subpath) if pool_subpath else None
+        pool_stats = (
+            _statvfs_usage(pool_path) if pool_path is not None else None
+        ) or {
             "total_bytes": 0,
             "used_bytes": 0,
             "avail_bytes": 0,
             "used_pct": 0.0,
         }
-        disk_mounts = _resolve_disk_mounts()
+        disk_mounts = _resolve_disk_mounts(pool_subpath=pool_subpath)
         pool = {
-            "name": "Pool Médias (MergerFS)",
-            "mount": "/mnt/pool_medias",
+            "name": "Pool MergerFS",
+            "mount": f"/mnt/{pool_subpath}" if pool_subpath else "",
             "fstype": "fuse.mergerfs",
             "policy": "mfs (Most Free Space)",
             "drives_count": len(disk_mounts),
-            "available": (HOST_MNT_ROOT / "pool_medias").exists(),
+            "available": bool(pool_path is not None and pool_path.exists()),
             **pool_stats,
         }
 

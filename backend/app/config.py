@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     pve_token_secret: str = ""
     pve_verify_ssl: bool = False
     panel_self_vmid: int = 116
+    mergerfs_pool_subpath: str = ""
 
     jellyfin_url: str = ""
     jellyfin_api_key: str = ""
@@ -135,6 +136,7 @@ def _settings_from_app_config(cfg: AppConfig) -> Settings:
         pve_token_secret=cfg.proxmox.token_secret,
         pve_verify_ssl=cfg.proxmox.verify_ssl,
         panel_self_vmid=cfg.proxmox.panel_self_vmid,
+        mergerfs_pool_subpath=cfg.proxmox.mergerfs_pool_subpath,
         jellyfin_url=cfg.integrations.jellyfin.url,
         jellyfin_api_key=cfg.integrations.jellyfin.api_key,
         jellyseerr_url=cfg.integrations.jellyseerr.url,

@@ -65,6 +65,7 @@ Consultez [`config/config.example.yaml`](../../config/config.example.yaml) pour 
 | `verify_ssl` | `bool` | `false` | Vérifie le certificat TLS Proxmox VE |
 | `default_node` | `str` | `"pve"` | Nom du nœud cible sous `/api2/json/nodes/<node>` |
 | `panel_self_vmid` | `int` | `116` | `>= 1` ; bloque les actions `stop` et `shutdown` sur ce VMID |
+| `mergerfs_pool_subpath` | `str` | `""` | Sous-dossier optionnel du pool MergerFS sous `HOST_MNT_ROOT` (vide = auto-détection) |
 
 ### `integrations`
 
@@ -134,7 +135,7 @@ Alimente `/api/widgets/*`, `/api/ops/*` et `/api/users/*` :
 ### `categories[]` & `storage_mounts[]`
 
 - **`categories[]`** : tuiles héritées (`name`, `services[]` avec `id`, `name`, `description`, `url`, `ping_url`, `icon`, `widget`).
-- **`storage_mounts[]`** : correspondance disques (`mount`, `subpath`, `wwn`, `label`) associant `/host_mnt/<subpath>` (`statvfs`) et infos SMART Proxmox. Si vide, les sous-dossiers de `HOST_MNT_ROOT` (hors `pool_medias`) sont auto-détectés.
+- **`storage_mounts[]`** : correspondance disques (`mount`, `subpath`, `wwn`, `label`) associant `/host_mnt/<subpath>` (`statvfs`) et infos SMART Proxmox. Si vide, les sous-dossiers de `HOST_MNT_ROOT` (hors sous-dossier du pool MergerFS actif) sont auto-détectés.
 
 ---
 
@@ -156,5 +157,5 @@ Alimente `/api/widgets/*`, `/api/ops/*` et `/api/users/*` :
 ### Variables déclarées dans `.env.example`
 
 - **Auth & Chemins** : `DEV_AUTH_BYPASS`, `ALLOWED_TAILSCALE_USERS`, `PROTECTED_OWNER_USERNAME`, `SERVICES_CONFIG_PATH`, `STATIC_DIR`
-- **Proxmox VE** : `PVE_HOST`, `PVE_NODE`, `PVE_TOKEN_ID`, `PVE_TOKEN_SECRET`, `PVE_VERIFY_SSL`, `PANEL_SELF_VMID`
+- **Proxmox VE** : `PVE_HOST`, `PVE_NODE`, `PVE_TOKEN_ID`, `PVE_TOKEN_SECRET`, `PVE_VERIFY_SSL`, `PANEL_SELF_VMID`, `MERGERFS_POOL_SUBPATH`
 - **Médias & Téléchargements** : `JELLYFIN_URL`, `JELLYFIN_API_KEY`, `JELLYSEERR_URL`, `JELLYSEERR_API_KEY`, `PLEX_URL`, `PLEX_TOKEN`, `RADARR_URL`, `RADARR_API_KEY`, `SONARR_URL`, `SONARR_API_KEY`, `PROWLARR_URL`, `PROWLARR_API_KEY`, `QBIT_URL`, `QBIT_USERNAME`, `QBIT_PASSWORD`

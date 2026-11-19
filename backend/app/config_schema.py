@@ -141,11 +141,21 @@ class ProxmoxConfig(BaseModel):
     verify_ssl: bool = False
     default_node: str = "pve"
     panel_self_vmid: int = Field(default=116, ge=1)
+    mergerfs_pool_subpath: str = ""
 
     @field_validator("host", "token_id", "default_node", mode="before")
     @classmethod
     def _strip_str(cls, value: Any) -> str:
         return str(value or "").strip()
+
+    @field_validator("mergerfs_pool_subpath", mode="before")
+    @classmethod
+    def _normalize_pool_subpath(cls, value: Any) -> str:
+        cleaned = str(value or "").strip().strip("/")
+        parts = [p for p in cleaned.split("/") if p]
+        if not parts or any(p in (".", "..") for p in parts):
+            return ""
+        return "/".join(parts)
 
     @field_validator("token_secret", mode="before")
     @classmethod

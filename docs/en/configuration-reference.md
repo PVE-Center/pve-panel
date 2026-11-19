@@ -65,6 +65,7 @@ See [`config/config.example.yaml`](../../config/config.example.yaml) for a compl
 | `verify_ssl` | `bool` | `false` | Verify TLS certificate when talking to Proxmox VE |
 | `default_node` | `str` | `"pve"` | Target Proxmox node name under `/api2/json/nodes/<node>` |
 | `panel_self_vmid` | `int` | `116` | `>= 1`; protects this VMID from `stop` and `shutdown` actions |
+| `mergerfs_pool_subpath` | `str` | `""` | Optional subpath under `HOST_MNT_ROOT` for your MergerFS pool (empty auto-detects) |
 
 ### `integrations`
 
@@ -134,7 +135,7 @@ Each built-in integration feeds `/api/widgets/*`, `/api/ops/*`, and `/api/users/
 ### `categories[]` & `storage_mounts[]`
 
 - **`categories[]`**: Legacy service tiles (`name`, `services[]` with `id`, `name`, `description`, `url`, `ping_url`, `icon`, `widget`).
-- **`storage_mounts[]`**: Physical disk mappings (`mount`, `subpath`, `wwn`, `label`) used to correlate `/host_mnt/<subpath>` `statvfs` usage with Proxmox SMART disk metadata. If empty, subdirectories under `HOST_MNT_ROOT` (excluding `pool_medias`) are auto-discovered.
+- **`storage_mounts[]`**: Physical disk mappings (`mount`, `subpath`, `wwn`, `label`) used to correlate `/host_mnt/<subpath>` `statvfs` usage with Proxmox SMART disk metadata. If empty, subdirectories under `HOST_MNT_ROOT` (excluding the active MergerFS pool subpath) are auto-discovered.
 
 ---
 
@@ -156,5 +157,5 @@ Each built-in integration feeds `/api/widgets/*`, `/api/ops/*`, and `/api/users/
 ### Variables Defined in `.env.example`
 
 - **Auth & Paths**: `DEV_AUTH_BYPASS`, `ALLOWED_TAILSCALE_USERS`, `PROTECTED_OWNER_USERNAME`, `SERVICES_CONFIG_PATH`, `STATIC_DIR`
-- **Proxmox VE**: `PVE_HOST`, `PVE_NODE`, `PVE_TOKEN_ID`, `PVE_TOKEN_SECRET`, `PVE_VERIFY_SSL`, `PANEL_SELF_VMID`
+- **Proxmox VE**: `PVE_HOST`, `PVE_NODE`, `PVE_TOKEN_ID`, `PVE_TOKEN_SECRET`, `PVE_VERIFY_SSL`, `PANEL_SELF_VMID`, `MERGERFS_POOL_SUBPATH`
 - **Media & Download Clients**: `JELLYFIN_URL`, `JELLYFIN_API_KEY`, `JELLYSEERR_URL`, `JELLYSEERR_API_KEY`, `PLEX_URL`, `PLEX_TOKEN`, `RADARR_URL`, `RADARR_API_KEY`, `SONARR_URL`, `SONARR_API_KEY`, `PROWLARR_URL`, `PROWLARR_API_KEY`, `QBIT_URL`, `QBIT_USERNAME`, `QBIT_PASSWORD`
