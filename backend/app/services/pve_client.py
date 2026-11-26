@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 from typing import Any, Literal
+from urllib.parse import quote
 
 import httpx
 
@@ -671,3 +672,106 @@ class ProxmoxClient:
             "action": action,
             "upid": payload.get("data", ""),
         }
+
+    async def list_apt_updates(self, node: str | None = None) -> list[dict[str, Any]]:
+        """Return pending APT package updates reported by Proxmox VE on a node."""
+        settings = get_settings()
+        base_host = settings.pve_host.rstrip("/")
+        if not base_host:
+            return []
+        try:
+            resp = await self._http.get(
+                f"{self._base_url(node)}/apt/update", headers=self._headers()
+            )
+            data = self._extract_data(resp, default=[])
+            return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    async def refresh_apt_database(self, node: str | None = None) -> str | None:
+        """Trigger `apt-get update` on a Proxmox node via REST API and return task UPID if started."""
+        settings = get_settings()
+        base_host = settings.pve_host.rstrip("/")
+        if not base_host:
+            return None
+        try:
+            resp = await self._http.post(
+                f"{self._base_url(node)}/apt/update", headers=self._headers()
+            )
+            if resp.status_code >= 400:
+                return None
+            upid = self._extract_data(resp, default="")
+            return str(upid).strip() or None
+        except Exception:
+            return None
+
+    async def wait_task(
+        self, node: str | None, upid: str, *, timeout_sec: float = 20.0
+    ) -> str:
+        """Poll a Proxmox UPID task status briefly until stopped or timeout."""
+        if not upid:
+            return "unknown"
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(1.0, timeout_sec)
+        url = f"{self._base_url(node)}/tasks/{quote(upid, safe='')}/status"
+        while loop.time() < deadline:
+            try:
+                resp = await self._http.get(url, headers=self._headers())
+                data = self._extract_data(resp, default={})
+                if isinstance(data, dict) and data.get("status") == "stopped":
+                    return str(data.get("exitstatus") or "OK")
+            except Exception:
+                return "unknown"
+            await asyncio.sleep(1.0)
+        return "running"
+
+    async def qemu_agent_exec(
+        self,
+        node: str | None,
+        vmid: int,
+        command: list[str],
+        *,
+        timeout_sec: float = 120.0,
+    ) -> tuple[bool, str]:
+        """Execute a command inside a QEMU VM via Proxmox QEMU Guest Agent API."""
+        base = self._base_url(node)
+        try:
+            resp = await self._http.post(
+                f"{base}/qemu/{vmid}/agent/exec",
+                headers=self._headers(),
+                json={"command": command},
+            )
+        except Exception as exc:
+            return False, f"Erreur communication QEMU Guest Agent : {exc}"
+
+        if resp.status_code >= 400:
+            return False, f"QEMU Guest Agent indisponible (HTTP {resp.status_code}) : {resp.text[:240]}"
+
+        payload = self._extract_data(resp, default={})
+        pid = payload.get("pid") if isinstance(payload, dict) else None
+        if pid is None:
+            return False, "QEMU Guest Agent n'a pas renvoyé de PID."
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(5.0, timeout_sec)
+        status_url = f"{base}/qemu/{vmid}/agent/exec-status"
+        while loop.time() < deadline:
+            await asyncio.sleep(1.0)
+            try:
+                st_resp = await self._http.get(
+                    status_url, headers=self._headers(), params={"pid": pid}
+                )
+            except Exception as exc:
+                return False, f"Erreur lecture statut QEMU Guest Agent : {exc}"
+            if st_resp.status_code >= 400:
+                continue
+            st_data = self._extract_data(st_resp, default={})
+            if not isinstance(st_data, dict):
+                continue
+            if int(st_data.get("exited", 0)) == 1:
+                exit_code = int(st_data.get("exitcode", 1))
+                out_txt = str(st_data.get("out-data") or "").strip()
+                err_txt = str(st_data.get("err-data") or "").strip()
+                combined = "\n".join(part for part in (out_txt, err_txt) if part)
+                return exit_code == 0, combined
+        return False, f"Délai dépassé ({int(timeout_sec)}s) lors de l'exécution QEMU Guest Agent."

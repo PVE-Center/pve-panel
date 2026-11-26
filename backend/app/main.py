@@ -28,6 +28,7 @@ from app.routers import (
     proxmox,
     services,
     setup,
+    updates,
     users,
     widgets,
 )
@@ -37,6 +38,7 @@ from app.services.notifications import NotificationDispatcher
 from app.services.pairing_relay import PairingRelayStore
 from app.services.realtime_bus import get_realtime_bus
 from app.services.state_store import StateStore
+from app.services.update_manager import UpdateManager
 
 
 @asynccontextmanager
@@ -74,6 +76,13 @@ async def lifespan(app: FastAPI):
         bus=realtime_bus,
         http_client=media_http,
     )
+    update_manager = UpdateManager(
+        config_manager=config_manager,
+        bus=realtime_bus,
+        pve_http=pve_http,
+        outbound_http=media_http,
+        app_version=app.version,
+    )
 
     app.state.config_manager = config_manager
     app.state.realtime_bus = realtime_bus
@@ -84,6 +93,7 @@ async def lifespan(app: FastAPI):
     app.state.notification_dispatcher = dispatcher
     app.state.mdns_publisher = mdns_publisher
     app.state.alert_engine = alert_engine
+    app.state.update_manager = update_manager
 
     async def _on_config_reload(new_cfg: AppConfig) -> None:
         alert_engine.notify_config_reload(new_cfg)
@@ -133,6 +143,7 @@ app.include_router(setup.router)
 app.include_router(widgets.router)
 app.include_router(users.router)
 app.include_router(operations.router)
+app.include_router(updates.router)
 
 
 _NO_STORE_HTML_HEADERS = {

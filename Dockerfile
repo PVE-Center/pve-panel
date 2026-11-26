@@ -13,7 +13,7 @@ FROM python:3.12-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends iputils-ping ca-certificates \
+    && apt-get install -y --no-install-recommends iputils-ping ca-certificates openssh-client git \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /app/config
 

@@ -28,6 +28,7 @@ _ADMIN_ONLY_READ_PATHS = frozenset(
         "/api/config/export",
         "/api/auth/tokens",
         "/api/discovery/qr",
+        "/api/updates/setup-info",
     }
 )
 _FIRST_RUN_EXEMPT_EXACT = frozenset(
@@ -108,6 +109,7 @@ def check_role_permission(role: str, path: str, method: str) -> tuple[bool, str]
             or path.startswith("/api/operations/")
             or path.startswith("/api/ops/")
             or path.startswith("/api/incidents/")
+            or path == "/api/updates/check"
             or _CUSTOM_SERVICE_TEST_RE.match(path)
             or _SERVICE_ITEM_TEST_RE.match(path)
         ):

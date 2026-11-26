@@ -740,3 +740,85 @@ export interface SetupConfigUpdateResponse {
   is_configured: boolean;
   message: string;
 }
+
+export type UpdateCategory = 'pve_center' | 'proxmox' | 'containers_vms' | 'docker';
+
+export type UpdateTargetKind =
+  | 'panel_server'
+  | 'client_app'
+  | 'pve_node'
+  | 'lxc'
+  | 'qemu'
+  | 'docker_compose';
+
+export interface UpdateTargetItem {
+  id: string;
+  category: UpdateCategory;
+  kind: UpdateTargetKind;
+  name: string;
+  subtitle: string;
+  scope?: 'local' | 'proxmox_host' | 'lxc' | 'qemu';
+  node: string | null;
+  vmid: number | null;
+  compose_dir?: string;
+  status: string;
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  pending_count: number | null;
+  packages_preview: string[];
+  can_execute: boolean;
+  requires_ssh: boolean;
+  release_url: string | null;
+  last_checked_at: string | null;
+}
+
+export type UpdateJobStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+
+export interface UpdateJobStep {
+  target_id: string;
+  name: string;
+  category: UpdateCategory;
+  status: UpdateJobStatus;
+  message: string;
+}
+
+export interface UpdateJob {
+  id: string;
+  status: UpdateJobStatus;
+  started_at: string;
+  finished_at: string | null;
+  progress_pct: number;
+  steps: UpdateJobStep[];
+  logs: string[];
+}
+
+export interface UpdatesSummary {
+  total_targets: number;
+  updates_available: number;
+  pending_packages: number;
+  executable_targets: number;
+}
+
+export interface UpdatesOverviewResponse {
+  enabled: boolean;
+  ssh_configured: boolean;
+  ssh_message: string;
+  ssh_host: string;
+  last_checked_at: string | null;
+  summary: UpdatesSummary;
+  targets: UpdateTargetItem[];
+  active_job: UpdateJob | null;
+  recent_jobs: UpdateJob[];
+}
+
+export interface UpdatesSetupInfoResponse {
+  ssh_configured: boolean;
+  ssh_message: string;
+  ssh_host: string;
+  ssh_port: number;
+  ssh_user: string;
+  ssh_public_key: string;
+  proxmox_one_liner: string;
+  panel_repo_dir: string;
+}

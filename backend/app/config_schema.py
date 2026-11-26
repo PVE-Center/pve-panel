@@ -419,6 +419,67 @@ class StorageMountConfig(BaseModel):
         return self
 
 
+UpdateDockerScope = Literal["local", "proxmox_host", "lxc", "qemu"]
+_VALID_ABS_UNIX_DIR_RE = re.compile(r"^/[A-Za-z0-9._/@+-]+$")
+
+
+class DockerUpdateTargetConfig(BaseModel):
+    """Configured Docker Compose stack target for centralized updates."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid4())[:8])
+    name: str = Field(..., min_length=1)
+    enabled: bool = True
+    scope: UpdateDockerScope = "lxc"
+    node: str = ""
+    vmid: int | None = Field(default=None, ge=1)
+    compose_dir: str = Field(..., min_length=2)
+
+    @field_validator("id", "name", "node", mode="before")
+    @classmethod
+    def _strip_fields(cls, value: Any) -> str:
+        return str(value or "").strip()
+
+    @field_validator("compose_dir", mode="before")
+    @classmethod
+    def _validate_compose_dir(cls, value: Any) -> str:
+        cleaned = str(value or "").strip().rstrip("/") or "/"
+        parts = cleaned.split("/")
+        if (
+            not _VALID_ABS_UNIX_DIR_RE.fullmatch(cleaned)
+            or ".." in parts
+            or cleaned == "/"
+        ):
+            raise ValueError(
+                "compose_dir must be a safe non-root absolute POSIX directory path."
+            )
+        return cleaned
+
+
+class UpdatesConfig(BaseModel):
+    """Centralized Update Center settings (Proxmox SSH automation, PVE Panel & Docker targets)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    github_org: str = "PVE-Center"
+    ssh_host: str = ""
+    ssh_port: int = Field(default=22, ge=1, le=65535)
+    ssh_user: str = "root"
+    ssh_key_path: str = ""
+    panel_repo_dir: str = "/opt/pve-panel"
+    auto_autoremove: bool = True
+    docker_targets: list[DockerUpdateTargetConfig] = Field(default_factory=list)
+
+    @field_validator(
+        "github_org", "ssh_host", "ssh_user", "ssh_key_path", "panel_repo_dir", mode="before"
+    )
+    @classmethod
+    def _strip_text(cls, value: Any) -> str:
+        return str(value or "").strip()
+
+
 class AppConfig(BaseModel):
     """Complete declarative configuration model for PVE Command Center."""
 
@@ -431,6 +492,7 @@ class AppConfig(BaseModel):
     integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+    updates: UpdatesConfig = Field(default_factory=UpdatesConfig)
     categories: list[ServiceCategoryConfig] = Field(default_factory=list)
     custom_services: list[CustomServiceConfig] = Field(default_factory=list)
     storage_mounts: list[StorageMountConfig] = Field(default_factory=list)
@@ -507,6 +569,12 @@ def validate_app_config(
         if tok.id in seen_tokens:
             errors.append(f"security.api_tokens[{idx}].id: Duplicate token id '{tok.id}'.")
         seen_tokens.add(tok.id)
+
+    seen_docker: set[str] = set()
+    for idx, target in enumerate(config.updates.docker_targets):
+        if target.id in seen_docker:
+            errors.append(f"updates.docker_targets[{idx}].id: Duplicate docker target id '{target.id}'.")
+        seen_docker.add(target.id)
 
     if config.security.dev_auth_bypass:
         warnings.append("security.dev_auth_bypass is true (loopback auth disabled — never use in production).")

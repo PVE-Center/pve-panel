@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
+  ArrowUpCircle,
   CheckCircle2,
   HardDrive,
   LayoutGrid,
@@ -24,6 +25,7 @@ import { AuthLoginModal, ServerConfigModal } from './components/ServerConfigModa
 import { ServiceCard } from './components/ServiceCard';
 import { SetupWizardModal } from './components/SetupWizardModal';
 import { StorageSection } from './components/StorageSection';
+import { UpdatesSection } from './components/UpdatesSection';
 import { UsersSection } from './components/UsersSection';
 import { YamlConfigEditorModal } from './components/YamlConfigEditorModal';
 import {
@@ -55,11 +57,12 @@ import type {
   ServiceHealthStatus,
   ServiceItem,
   SetupStatusResponse,
+  UpdatesOverviewResponse,
   UsersOverview,
   WidgetsMap,
 } from './types';
 
-type ActiveTab = 'all' | 'storage' | 'services' | 'proxmox' | 'ops' | 'users';
+type ActiveTab = 'all' | 'storage' | 'services' | 'proxmox' | 'ops' | 'updates' | 'users';
 
 export function App() {
   const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
@@ -71,6 +74,7 @@ export function App() {
   const [usersOverview, setUsersOverview] = useState<UsersOverview | null>(null);
   const [opsOverview, setOpsOverview] = useState<OpsOverview | null>(null);
   const [incidentsData, setIncidentsData] = useState<IncidentsResponse | null>(null);
+  const [updatesOverview, setUpdatesOverview] = useState<UpdatesOverviewResponse | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatusResponse | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
@@ -144,6 +148,11 @@ export function App() {
   const fetchIncidentsOnly = useCallback(async () => {
     const resp = await fetch('/api/incidents?limit=50');
     if (resp.ok) setIncidentsData(await resp.json());
+  }, []);
+
+  const fetchUpdatesOnly = useCallback(async () => {
+    const resp = await fetch('/api/updates/overview');
+    if (resp.ok) setUpdatesOverview(await resp.json());
   }, []);
 
   const fetchServicesOnly = useCallback(async () => {
@@ -227,7 +236,7 @@ export function App() {
         ? `/api/pve/overview?node=${encodeURIComponent(targetNode)}`
         : '/api/pve/overview';
 
-      const [pveResp, svcResp, csResp, widResp, usrResp, opsResp, incResp, setupResp] =
+      const [pveResp, svcResp, csResp, widResp, usrResp, opsResp, incResp, updResp, setupResp] =
         await Promise.all([
           fetch(pveOverviewUrl),
           fetch('/api/services'),
@@ -236,6 +245,7 @@ export function App() {
           fetch('/api/users'),
           fetch('/api/ops/overview'),
           fetch('/api/incidents?limit=50'),
+          fetch('/api/updates/overview'),
           fetch('/api/setup/status'),
         ]);
 
@@ -257,6 +267,7 @@ export function App() {
       if (usrResp.ok) setUsersOverview(await usrResp.json());
       if (opsResp.ok) setOpsOverview(await opsResp.json());
       if (incResp.ok) setIncidentsData(await incResp.json());
+      if (updResp.ok) setUpdatesOverview(await updResp.json());
       if (setupResp.ok) {
         setSetupStatus((await setupResp.json()) as SetupStatusResponse);
       }
@@ -385,6 +396,8 @@ export function App() {
         }
       } else if (event.type === 'config_reloaded') {
         void fetchAllData();
+      } else if (event.type === 'update_job_progress') {
+        void fetchUpdatesOnly();
       }
     });
 
@@ -641,6 +654,7 @@ export function App() {
   ).length;
   const activeIncidentsCount = incidentsData?.active_count ?? 0;
   const opsAlertCount = pendingSeerrCount + activeIncidentsCount;
+  const availableUpdatesCount = updatesOverview?.summary.updates_available ?? 0;
 
   const navTabs: Array<{
     id: ActiveTab;
@@ -672,6 +686,14 @@ export function App() {
             ? `${pendingSeerrCount} en attente`
             : undefined,
       dot: opsAlertCount > 0,
+    },
+    {
+      id: 'updates',
+      label: 'Mises à jour',
+      shortLabel: 'MAJ',
+      icon: ArrowUpCircle,
+      badge: availableUpdatesCount > 0 ? `${availableUpdatesCount}` : undefined,
+      dot: availableUpdatesCount > 0,
     },
     { id: 'users', label: 'Utilisateurs', shortLabel: 'Comptes', icon: Users },
   ];
@@ -809,6 +831,7 @@ export function App() {
           usersOverview={usersOverview}
           opsOverview={opsOverview}
           incidentsData={incidentsData}
+          updatesOverview={updatesOverview}
           onJumpToTab={(tab) => setActiveTab(tab)}
         />
 
@@ -838,6 +861,15 @@ export function App() {
             search={search}
             onRefreshOps={fetchOpsOnly}
             onRefreshIncidents={fetchIncidentsOnly}
+            onToast={setToast}
+          />
+        )}
+
+        {/* Onglet Centre de Mises à Jour Unifié */}
+        {activeTab === 'updates' && (
+          <UpdatesSection
+            overview={updatesOverview}
+            onRefreshUpdates={fetchUpdatesOnly}
             onToast={setToast}
           />
         )}

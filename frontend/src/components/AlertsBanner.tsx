@@ -5,10 +5,11 @@ import type {
   OpsOverview,
   PveOverview,
   ServiceCategory,
+  UpdatesOverviewResponse,
   UsersOverview,
 } from '../types';
 
-export type NavTabTarget = 'storage' | 'services' | 'proxmox' | 'users' | 'ops';
+export type NavTabTarget = 'storage' | 'services' | 'proxmox' | 'users' | 'ops' | 'updates';
 
 interface AlertsBannerProps {
   pveOverview: PveOverview | null;
@@ -16,6 +17,7 @@ interface AlertsBannerProps {
   usersOverview: UsersOverview | null;
   opsOverview: OpsOverview | null;
   incidentsData?: IncidentsResponse | null;
+  updatesOverview?: UpdatesOverviewResponse | null;
   onJumpToTab: (tab: NavTabTarget) => void;
 }
 
@@ -32,6 +34,7 @@ export function AlertsBanner({
   usersOverview,
   opsOverview,
   incidentsData,
+  updatesOverview,
   onJumpToTab,
 }: AlertsBannerProps) {
   const [expanded, setExpanded] = useState(false);
@@ -110,6 +113,15 @@ export function AlertsBanner({
       severity: 'warn',
       text: `${usersOverview.counts.unsynced_count} utilisateur(s) Jellyfin non synchronisé(s) sur Jellyseerr`,
       tab: 'users',
+    });
+  }
+
+  if (updatesOverview && updatesOverview.summary.updates_available > 0) {
+    alerts.push({
+      id: 'updates-available',
+      severity: 'warn',
+      text: `${updatesOverview.summary.updates_available} cible(s) prêtes à être mises à jour (${updatesOverview.summary.pending_packages} paquet(s)/image(s))`,
+      tab: 'updates',
     });
   }
 

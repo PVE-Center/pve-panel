@@ -38,6 +38,10 @@ import type {
   SetupTestServiceResponse,
   StorageMountConfig,
   UnifiedUser,
+  UpdateJob,
+  UpdatesOverviewResponse,
+  UpdatesSetupInfoResponse,
+  UpdateTargetItem,
   UsersOverview,
   WebhookChannelItem,
   WidgetsMap,
@@ -150,6 +154,11 @@ interface DemoState {
   apns: APNsConfigSummary;
   webhooks: WebhookChannelItem[];
   storageMounts: StorageMountConfig[];
+  updatesTargets: UpdateTargetItem[];
+  activeUpdateJob: UpdateJob | null;
+  recentUpdateJobs: UpdateJob[];
+  updatesSshConfigured: boolean;
+  updatesLastCheckedAt: string | null;
   yamlOverride: string | null;
 }
 
@@ -881,6 +890,175 @@ function createInitialDemoState(): DemoState {
         label: 'Cache NVMe • 2 To',
       },
     ],
+    updatesTargets: [
+      {
+        id: 'panel:server',
+        category: 'pve_center',
+        kind: 'panel_server',
+        name: 'Serveur PVE Command Center',
+        subtitle: 'Repo /opt/pve-panel • conteneur LXC #116',
+        node: 'pve-node-01',
+        vmid: 116,
+        status: 'online',
+        current_version: 'v1.0.0',
+        latest_version: 'v1.1.0',
+        update_available: true,
+        pending_count: 1,
+        packages_preview: ['pve-panel -> v1.1.0'],
+        can_execute: true,
+        requires_ssh: true,
+        release_url: 'https://github.com/PVE-Center/pve-panel/releases',
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'client:desktop',
+        category: 'pve_center',
+        kind: 'client_app',
+        name: 'Client Desktop (Windows / Linux)',
+        subtitle: 'Tauri v2 auto-updater (.exe / .msi / .AppImage / .deb)',
+        node: null,
+        vmid: null,
+        status: 'available',
+        current_version: 'v1.0.0',
+        latest_version: 'v1.1.0',
+        update_available: true,
+        pending_count: null,
+        packages_preview: ['PVE.Center-setup.exe', 'pve-center_amd64.AppImage'],
+        can_execute: false,
+        requires_ssh: false,
+        release_url: 'https://github.com/PVE-Center/pve-center-clients/releases',
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'client:android',
+        category: 'pve_center',
+        kind: 'client_app',
+        name: 'Application Android',
+        subtitle: 'Capacitor 8 APK (GitHub Releases)',
+        node: null,
+        vmid: null,
+        status: 'available',
+        current_version: 'v1.0.0',
+        latest_version: 'v1.1.0',
+        update_available: true,
+        pending_count: null,
+        packages_preview: ['pve-center-android.apk'],
+        can_execute: false,
+        requires_ssh: false,
+        release_url: 'https://github.com/PVE-Center/pve-center-clients/releases',
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'client:apple',
+        category: 'pve_center',
+        kind: 'client_app',
+        name: 'Applications Apple (iOS / macOS / tvOS)',
+        subtitle: 'Swift 6 natif (Xcode / TestFlight)',
+        node: null,
+        vmid: null,
+        status: 'available',
+        current_version: 'v1.0.0',
+        latest_version: 'v1.1.0',
+        update_available: true,
+        pending_count: null,
+        packages_preview: ['PVECenter.app (macOS / iOS / tvOS)'],
+        can_execute: false,
+        requires_ssh: false,
+        release_url: 'https://github.com/PVE-Center/pve-center-apple/releases',
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'proxmox:pve-node-01',
+        category: 'proxmox',
+        kind: 'pve_node',
+        name: 'Nœud Proxmox VE : pve-node-01',
+        subtitle: 'APT système & hyperviseur Proxmox',
+        node: 'pve-node-01',
+        vmid: null,
+        status: 'online',
+        current_version: 'APT',
+        latest_version: '3 paquet(s)',
+        update_available: true,
+        pending_count: 3,
+        packages_preview: [
+          'pve-manager (8.3.1 -> 8.3.2)',
+          'proxmox-ve (8.3.0 -> 8.3.1)',
+          'libpve-storage-perl (8.3.1 -> 8.3.3)',
+        ],
+        can_execute: true,
+        requires_ssh: true,
+        release_url: null,
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'lxc:102',
+        category: 'containers_vms',
+        kind: 'lxc',
+        name: 'ct-media-server (#102)',
+        subtitle: 'LXC sur pve-node-01 • running',
+        node: 'pve-node-01',
+        vmid: 102,
+        status: 'running',
+        current_version: 'OS invité',
+        latest_version: '5 paquet(s)',
+        update_available: true,
+        pending_count: 5,
+        packages_preview: [],
+        can_execute: true,
+        requires_ssh: true,
+        release_url: null,
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'qemu:103',
+        category: 'containers_vms',
+        kind: 'qemu',
+        name: 'vm-docker-host (#103)',
+        subtitle: 'QEMU sur pve-node-01 • running',
+        node: 'pve-node-01',
+        vmid: 103,
+        status: 'running',
+        current_version: 'OS invité',
+        latest_version: 'Prêt pour QEMU Guest Agent',
+        update_available: true,
+        pending_count: 4,
+        packages_preview: [],
+        can_execute: true,
+        requires_ssh: false,
+        release_url: null,
+        last_checked_at: twoMinAgo,
+      },
+      {
+        id: 'docker:media-stack',
+        category: 'docker',
+        kind: 'docker_compose',
+        name: 'Stack Docker : media-stack',
+        subtitle: 'LXC 102 (pve-node-01) • /opt/stacks/media',
+        scope: 'lxc',
+        node: 'pve-node-01',
+        vmid: 102,
+        compose_dir: '/opt/stacks/media',
+        status: 'running',
+        current_version: '4 conteneur(s)',
+        latest_version: 'Pull / Recreate',
+        update_available: true,
+        pending_count: 4,
+        packages_preview: [
+          'jellyfin (jellyfin/jellyfin:latest)',
+          'radarr (lscr.io/linuxserver/radarr:latest)',
+          'sonarr (lscr.io/linuxserver/sonarr:latest)',
+          'prowlarr (lscr.io/linuxserver/prowlarr:latest)',
+        ],
+        can_execute: true,
+        requires_ssh: true,
+        release_url: null,
+        last_checked_at: twoMinAgo,
+      },
+    ],
+    activeUpdateJob: null,
+    recentUpdateJobs: [],
+    updatesSshConfigured: true,
+    updatesLastCheckedAt: twoMinAgo,
     yamlOverride: null,
   };
 }
@@ -976,6 +1154,31 @@ function jsonResponse(data: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function buildDemoUpdatesOverview(): UpdatesOverviewResponse {
+  const targets = demoState.updatesTargets;
+  return {
+    enabled: true,
+    ssh_configured: demoState.updatesSshConfigured,
+    ssh_message: demoState.updatesSshConfigured
+      ? 'Connecté en SSH (root@192.168.1.10 • Mode Démo).'
+      : 'SSH Proxmox non autorisé.',
+    ssh_host: '192.168.1.10',
+    last_checked_at: demoState.updatesLastCheckedAt,
+    summary: {
+      total_targets: targets.length,
+      updates_available: targets.filter((t) => t.update_available).length,
+      pending_packages: targets.reduce(
+        (sum, t) => sum + (t.update_available && typeof t.pending_count === 'number' ? t.pending_count : 0),
+        0
+      ),
+      executable_targets: targets.filter((t) => t.can_execute).length,
+    },
+    targets,
+    active_job: demoState.activeUpdateJob,
+    recent_jobs: demoState.recentUpdateJobs,
+  };
 }
 
 function slugifyDemoId(name: string, existingIds: Set<string>): string {
@@ -2471,6 +2674,122 @@ async function handleDemoRequest(apiPath: string, init?: RequestInit): Promise<R
       message: 'Configuration enregistrée et rechargée à chaud (Démo).',
     };
     return jsonResponse(updated);
+  }
+
+  if (path === '/api/updates/overview' && method === 'GET') {
+    return jsonResponse(buildDemoUpdatesOverview());
+  }
+
+  if (path === '/api/updates/check' && method === 'POST') {
+    const ts = nowIso();
+    demoState.updatesLastCheckedAt = ts;
+    for (const target of demoState.updatesTargets) {
+      target.last_checked_at = ts;
+    }
+    return jsonResponse(buildDemoUpdatesOverview());
+  }
+
+  if (path === '/api/updates/jobs/current' && method === 'GET') {
+    return jsonResponse({
+      active_job: demoState.activeUpdateJob,
+      recent_jobs: demoState.recentUpdateJobs,
+    });
+  }
+
+  if (path === '/api/updates/setup-info' && method === 'GET') {
+    const pubKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDemoUpdateCenterKey000000000000 pve-center-updates';
+    const setupInfo: UpdatesSetupInfoResponse = {
+      ssh_configured: demoState.updatesSshConfigured,
+      ssh_message: demoState.updatesSshConfigured
+        ? 'Connecté en SSH (root@192.168.1.10 • Mode Démo).'
+        : 'Clé en attente d’autorisation.',
+      ssh_host: '192.168.1.10',
+      ssh_port: 22,
+      ssh_user: 'root',
+      ssh_public_key: pubKey,
+      proxmox_one_liner: `mkdir -p ~/.ssh && printf '%s\\n' '${pubKey}' >> ~/.ssh/authorized_keys`,
+      panel_repo_dir: '/opt/pve-panel',
+    };
+    return jsonResponse(setupInfo);
+  }
+
+  if (path === '/api/updates/ssh-key/rotate' && method === 'POST') {
+    demoState.updatesSshConfigured = true;
+    const pubKey = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIRotatedDemoKey00000000000000 pve-center-updates';
+    return jsonResponse({
+      ssh_configured: true,
+      ssh_message: 'Nouvelle clé Ed25519 générée (Mode Démo).',
+      ssh_host: '192.168.1.10',
+      ssh_port: 22,
+      ssh_user: 'root',
+      ssh_public_key: pubKey,
+      proxmox_one_liner: `mkdir -p ~/.ssh && printf '%s\\n' '${pubKey}' >> ~/.ssh/authorized_keys`,
+      panel_repo_dir: '/opt/pve-panel',
+    });
+  }
+
+  if (path === '/api/updates/run' && method === 'POST') {
+    if (demoState.activeUpdateJob?.status === 'running') {
+      return jsonResponse({ detail: 'Une opération de mise à jour est déjà en cours.' }, 409);
+    }
+    const reqIds = Array.isArray(body.target_ids) ? body.target_ids.map(String) : ['all'];
+    const includeSelf = body.include_panel_self !== false;
+    const selected = demoState.updatesTargets
+      .filter((t) =>
+        reqIds.includes('all')
+          ? t.can_execute && (t.id !== 'panel:server' || includeSelf)
+          : reqIds.includes(t.id) && t.can_execute
+      )
+      .sort((a, b) => (a.id === 'panel:server' ? 1 : 0) - (b.id === 'panel:server' ? 1 : 0));
+
+    if (selected.length === 0) {
+      return jsonResponse({ detail: 'Aucune cible exécutable trouvée.' }, 400);
+    }
+
+    const job: UpdateJob = {
+      id: `upd-demo-${Date.now().toString(36).slice(-5)}`,
+      status: 'running',
+      started_at: nowIso(),
+      finished_at: null,
+      progress_pct: 5,
+      steps: selected.map((t, i) => ({
+        target_id: t.id,
+        name: t.name,
+        category: t.category,
+        status: i === 0 ? 'running' : 'pending',
+        message: i === 0 ? 'Mise à jour en cours (Démo)…' : 'En attente',
+      })),
+      logs: [`[${nowIso().slice(11, 19)}] Démarrage de la mise à jour centralisée (${selected.length} cible(s)).`],
+    };
+    demoState.activeUpdateJob = job;
+
+    selected.forEach((target, idx) => {
+      window.setTimeout(() => {
+        if (!demoState.activeUpdateJob || demoState.activeUpdateJob.id !== job.id) return;
+        const step = demoState.activeUpdateJob.steps[idx];
+        if (step) {
+          step.status = 'succeeded';
+          step.message = `${target.name} mis à jour (Démo).`;
+        }
+        target.update_available = false;
+        target.pending_count = 0;
+        target.latest_version = 'À jour';
+        demoState.activeUpdateJob.logs.push(
+          `[${nowIso().slice(11, 19)}] OK ${target.name} -> À jour`
+        );
+        demoState.activeUpdateJob.progress_pct = Math.round(((idx + 1) / selected.length) * 100);
+        if (idx + 1 < selected.length && demoState.activeUpdateJob.steps[idx + 1]) {
+          demoState.activeUpdateJob.steps[idx + 1].status = 'running';
+          demoState.activeUpdateJob.steps[idx + 1].message = 'Mise à jour en cours…';
+        } else {
+          demoState.activeUpdateJob.status = 'succeeded';
+          demoState.activeUpdateJob.finished_at = nowIso();
+          demoState.recentUpdateJobs.unshift({ ...demoState.activeUpdateJob });
+        }
+      }, (idx + 1) * 650);
+    });
+
+    return jsonResponse({ ok: true, job });
   }
 
   return jsonResponse({ detail: `Endpoint démo non simulé: ${method} ${path}` }, 404);

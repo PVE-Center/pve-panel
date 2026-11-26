@@ -780,6 +780,27 @@ run_mode_a_proxmox() {
     --ts-hostname "$lxc_hostname" \
     --allowed-users "$allowed_users" \
     --pve-node "$pve_node"
+
+  log_info "Configuration automatique de la clé SSH Ed25519 du Centre de Mises à Jour..."
+  pct exec "$vmid" -- bash -c '
+    set -e
+    if [[ ! -f /opt/pve-panel/config/id_ed25519_updates.pub ]]; then
+      if command -v ssh-keygen >/dev/null 2>&1; then
+        ssh-keygen -t ed25519 -N "" -C "pve-center-updates" -f /opt/pve-panel/config/id_ed25519_updates >/dev/null
+      fi
+    fi
+  ' >/dev/null 2>&1 || true
+
+  local upd_pub=""
+  upd_pub="$(pct exec "$vmid" -- cat /opt/pve-panel/config/id_ed25519_updates.pub 2>/dev/null || true)"
+  if [[ -n "$upd_pub" ]]; then
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+    touch /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+    grep -qxF "$upd_pub" /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' "$upd_pub" >> /root/.ssh/authorized_keys
+    log_ok "Clé SSH du Centre de Mises à Jour autorisée dans /root/.ssh/authorized_keys (Proxmox, LXC & Docker prêts)."
+  fi
 }
 
 main() {

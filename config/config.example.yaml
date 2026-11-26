@@ -178,3 +178,13 @@ storage_mounts:
     subpath: "disk1"
     wwn: "0x5000000000000001"
     label: "Disque 4 To (Exemple)"
+
+updates:
+  enabled: true
+  github_org: "PVE-Center"
+  ssh_host: "" # Auto-derived from proxmox.host when empty
+  ssh_port: 22
+  ssh_user: "root"
+  panel_repo_dir: "/opt/pve-panel"
+  auto_autoremove: true
+  docker_targets: [] # Example: { id: "media", name: "Media Stack", scope: "lxc", vmid: 102, compose_dir: "/opt/stacks/media" }

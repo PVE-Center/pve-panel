@@ -9,6 +9,8 @@ config/config.yaml
 config/*.db
 config/*.db-*
 config/*.p8
+config/id_ed25519*
+config/updates_history.json
 *.p8
 *.pem
 *.key
