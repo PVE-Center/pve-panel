@@ -18,8 +18,10 @@ log_ok()    { printf "${GREEN}[OK]${NC}   %s\n" "$*"; }
 log_warn()  { printf "${YELLOW}[WARN]${NC} %s\n" "$*"; }
 log_err()   { printf "${RED}[ERR]${NC}  %s\n" "$*" >&2; }
 
+STREMIO_INSTALLER_URL="${STREMIO_INSTALLER_URL:-https://raw.githubusercontent.com/PVE-Center/pve-panel/main/scripts/install-stremio.sh}"
 NON_INTERACTIVE="false"
 IN_CONTAINER="false"
+QUIET_SUMMARY="false"
 ARG_VMID=""
 ARG_HOSTNAME="stremio"
 ARG_RAM="2048"
@@ -344,7 +346,7 @@ run_in_container() {
   host_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
   host_ip="${host_ip:-127.0.0.1}"
 
-  if [[ "$IN_CONTAINER" == "true" && -z "$vmid" ]]; then
+  if [[ "$IN_CONTAINER" == "true" && "$QUIET_SUMMARY" != "true" && -z "$vmid" ]]; then
     print_summary "$host_ip" "$port" "$domain" "$username" "$password" "" "$use_gpu"
   fi
 }
@@ -448,13 +450,22 @@ run_on_proxmox_host() {
   pct exec "$vmid" -- bash -c 'for i in $(seq 1 30); do getent hosts deb.debian.org >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'
 
   log_info "Installation de Docker & Stremio à l'intérieur du LXC ${vmid}..."
-  pct push "$vmid" "$0" /tmp/install-stremio.sh --perms 0755
+  local script_src="${BASH_SOURCE[0]:-}"
+  local tmp_script=""
+  if [[ -z "$script_src" || ! -f "$script_src" ]]; then
+    tmp_script="$(mktemp)"
+    curl -fsSL "$STREMIO_INSTALLER_URL" -o "$tmp_script"
+    script_src="$tmp_script"
+  fi
+  pct push "$vmid" "$script_src" /tmp/install-stremio.sh --perms 0755
+  [[ -n "$tmp_script" ]] && rm -f "$tmp_script"
   local gpu_flag=""
   [[ "$use_gpu" != "true" ]] && gpu_flag="--no-gpu"
 
   pct exec "$vmid" -- bash /tmp/install-stremio.sh \
     --in-container \
     --non-interactive \
+    --quiet-summary \
     --port "$port" \
     --domain "$domain" \
     --username "$username" \
@@ -473,6 +484,7 @@ main() {
     case "$1" in
       --in-container)    IN_CONTAINER="true"; shift ;;
       --non-interactive) NON_INTERACTIVE="true"; shift ;;
+      --quiet-summary)   QUIET_SUMMARY="true"; shift ;;
       --vmid)            ARG_VMID="${2:-}"; shift 2 ;;
       --hostname)        ARG_HOSTNAME="${2:-}"; shift 2 ;;
       --ram)             ARG_RAM="${2:-}"; shift 2 ;;
