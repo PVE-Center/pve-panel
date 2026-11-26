@@ -41,6 +41,7 @@ _SCALAR_SECRET_PATHS: tuple[tuple[str, ...], ...] = (
     ("integrations", "jellyfin", "api_key"),
     ("integrations", "jellyseerr", "api_key"),
     ("integrations", "plex", "token"),
+    ("integrations", "stremio", "password"),
     ("integrations", "radarr", "api_key"),
     ("integrations", "sonarr", "api_key"),
     ("integrations", "prowlarr", "api_key"),
@@ -640,6 +641,11 @@ class ConfigManager:
                 "plex": {
                     "url": env_lookup.get("PLEX_URL", ""),
                     "token": env_lookup.get("PLEX_TOKEN", ""),
+                },
+                "stremio": {
+                    "url": env_lookup.get("STREMIO_URL", ""),
+                    "username": env_lookup.get("STREMIO_USERNAME", ""),
+                    "password": env_lookup.get("STREMIO_PASSWORD", ""),
                 },
                 "radarr": {
                     "url": env_lookup.get("RADARR_URL", ""),

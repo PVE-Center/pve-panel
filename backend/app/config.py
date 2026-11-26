@@ -25,6 +25,7 @@ SECRET_ENV_KEYS = frozenset(
         "JELLYFIN_API_KEY",
         "JELLYSEERR_API_KEY",
         "PLEX_TOKEN",
+        "STREMIO_PASSWORD",
         "RADARR_API_KEY",
         "SONARR_API_KEY",
         "PROWLARR_API_KEY",
@@ -75,6 +76,10 @@ class Settings(BaseSettings):
 
     plex_url: str = ""
     plex_token: str = ""
+
+    stremio_url: str = ""
+    stremio_username: str = ""
+    stremio_password: str = ""
 
     radarr_url: str = ""
     radarr_api_key: str = ""
@@ -143,6 +148,9 @@ def _settings_from_app_config(cfg: AppConfig) -> Settings:
         jellyseerr_api_key=cfg.integrations.jellyseerr.api_key,
         plex_url=cfg.integrations.plex.url,
         plex_token=cfg.integrations.plex.token,
+        stremio_url=cfg.integrations.stremio.url,
+        stremio_username=cfg.integrations.stremio.username,
+        stremio_password=cfg.integrations.stremio.password,
         radarr_url=cfg.integrations.radarr.url,
         radarr_api_key=cfg.integrations.radarr.api_key,
         sonarr_url=cfg.integrations.sonarr.url,

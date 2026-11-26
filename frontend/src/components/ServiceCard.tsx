@@ -24,6 +24,7 @@ import type {
   ServiceItem,
   ServiceProtocol,
   SonarrWidget,
+  StremioWidget,
   WidgetsMap,
 } from '../types';
 
@@ -239,6 +240,47 @@ function renderWidget(widgetType: string | undefined, widgets: WidgetsMap) {
         />
         <MetricPill label="Requêtes" value={data.queries ?? 0} />
         <MetricPill label="Grabs" value={data.grabs ?? 0} highlight />
+      </div>
+    );
+  }
+
+  if (widgetType === 'stremio') {
+    const data = widgets.stremio as StremioWidget | undefined;
+    if (!data || data.status !== 'ok') {
+      return <div className="text-xs text-slate-500">Métriques indisponibles</div>;
+    }
+    const ver = data.server_version
+      ? data.server_version.startsWith('v')
+        ? data.server_version
+        : `v${data.server_version}`
+      : 'OK';
+    const firstProfile = (data.hw_accel_profiles?.[0] || '').toLowerCase();
+    const transcodeLabel = firstProfile
+      ? firstProfile.includes('vaapi')
+        ? 'VAAPI'
+        : firstProfile.includes('nvenc')
+          ? 'NVENC'
+          : firstProfile.includes('qsv')
+            ? 'QSV'
+            : 'HW'
+      : data.hw_accel_enabled
+        ? 'HW'
+        : 'CPU';
+    const cacheLabel =
+      typeof data.cache_size_bytes === 'number'
+        ? data.cache_size_bytes === 0
+          ? 'Off'
+          : `${(data.cache_size_bytes / 1024 ** 3).toFixed(1)} Go`
+        : 'Auto';
+    return (
+      <div className="grid grid-cols-3 gap-2">
+        <MetricPill label="Version" value={ver} />
+        <MetricPill
+          label="Transcodage"
+          value={transcodeLabel}
+          highlight={Boolean(data.hw_accel_enabled)}
+        />
+        <MetricPill label="Cache" value={cacheLabel} />
       </div>
     );
   }

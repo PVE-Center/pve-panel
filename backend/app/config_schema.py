@@ -230,6 +230,26 @@ class QBittorrentIntegration(BaseModel):
         return "" if value is None else str(value)
 
 
+class StremioIntegration(BaseModel):
+    """Stremio Web & Streaming Server integration configuration."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    url: str = ""
+    username: str = ""
+    password: str = ""
+
+    @field_validator("url", "username", mode="before")
+    @classmethod
+    def _strip_fields(cls, value: Any) -> str:
+        return str(value or "").strip()
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def _coerce_password(cls, value: Any) -> str:
+        return "" if value is None else str(value)
+
+
 class IntegrationsConfig(BaseModel):
     """Built-in homelab media & download integrations."""
 
@@ -238,6 +258,7 @@ class IntegrationsConfig(BaseModel):
     jellyfin: UrlApiKeyIntegration = Field(default_factory=UrlApiKeyIntegration)
     jellyseerr: UrlApiKeyIntegration = Field(default_factory=UrlApiKeyIntegration)
     plex: PlexIntegration = Field(default_factory=PlexIntegration)
+    stremio: StremioIntegration = Field(default_factory=StremioIntegration)
     radarr: UrlApiKeyIntegration = Field(default_factory=UrlApiKeyIntegration)
     sonarr: UrlApiKeyIntegration = Field(default_factory=UrlApiKeyIntegration)
     prowlarr: UrlApiKeyIntegration = Field(default_factory=UrlApiKeyIntegration)

@@ -152,6 +152,32 @@ export const BRAND_ICONS: BrandIconMeta[] = [
     ),
   },
   {
+    id: 'stremio',
+    label: 'Stremio',
+    tintClass:
+      'border-purple-500/35 bg-gradient-to-br from-purple-500/20 to-indigo-600/15 dark:border-purple-400/30',
+    aliases: ['stremio', 'stremio-web', 'stremio-server', 'streamio'],
+    keywords: ['stremio', 'streamio'],
+    renderSvg: (uid) => (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={`strem-${uid}`} x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#8A5AAB" />
+            <stop offset="1" stopColor="#5E35B1" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M12 2.4 21.6 12 12 21.6 2.4 12 12 2.4Z"
+          fill={`url(#strem-${uid})`}
+        />
+        <path
+          d="M10.2 8.6v6.8l5.6-3.4-5.6-3.4Z"
+          fill="#FFFFFF"
+        />
+      </svg>
+    ),
+  },
+  {
     id: 'jellyseerr',
     label: 'Jellyseerr / Overseerr',
     tintClass:

@@ -1,0 +1,35 @@
+# ==============================================================================
+# Stremio All-in-One (stremio-web + stremio-server + FFmpeg/VAAPI)
+# Documentation : https://pve-center.github.io/pve-center-website/fr/guide/stremio
+# ==============================================================================
+
+services:
+  stremio:
+    image: tsaridas/stremio-docker:latest
+    container_name: stremio
+    restart: unless-stopped
+    ports:
+      - "${STREMIO_PORT:-8080}:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./stremio-data:/root/.stremio-server
+    # Décommenter sous Linux / LXC avec passthrough GPU pour le transcodage matériel VAAPI :
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # Note (noyaux >= 6.1 avec GPU hybride, issue #141) : si seul renderD129 est VA-API capable,
+    # remappez-le vers renderD128 :
+    #   - /dev/dri/renderD129:/dev/dri/renderD128
+    #   - /dev/dri/card1:/dev/dri/card1
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:11470/settings').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

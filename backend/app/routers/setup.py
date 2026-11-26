@@ -36,6 +36,7 @@ ServiceName = Literal[
     "jellyfin",
     "jellyseerr",
     "plex",
+    "stremio",
     "radarr",
     "sonarr",
     "prowlarr",
@@ -49,6 +50,7 @@ _SERVICE_SECRET_ATTR: dict[str, str] = {
     "jellyfin": "jellyfin_api_key",
     "jellyseerr": "jellyseerr_api_key",
     "plex": "plex_token",
+    "stremio": "stremio_password",
     "radarr": "radarr_api_key",
     "sonarr": "sonarr_api_key",
     "prowlarr": "prowlarr_api_key",
@@ -144,6 +146,9 @@ def _build_env_summary() -> dict[str, Any]:
         "jellyseerr_api_key_set": is_secret_configured(settings.jellyseerr_api_key),
         "plex_url": settings.plex_url,
         "plex_token_set": is_secret_configured(settings.plex_token),
+        "stremio_url": settings.stremio_url,
+        "stremio_username": settings.stremio_username,
+        "stremio_password_set": is_secret_configured(settings.stremio_password),
         "radarr_url": settings.radarr_url,
         "radarr_api_key_set": is_secret_configured(settings.radarr_api_key),
         "sonarr_url": settings.sonarr_url,
@@ -248,6 +253,36 @@ async def _run_service_probe(
         if resp.status_code in (401, 403):
             return False, "Token Plex refusé."
         return False, f"Erreur Plex HTTP {resp.status_code}."
+
+    if service == "stremio":
+        username = (payload.username or "").strip() or settings.stremio_username
+        auth = (
+            httpx.BasicAuth(username, secret)
+            if username and is_secret_configured(secret)
+            else None
+        )
+        resp = await client.get(f"{base_url}/settings", auth=auth)
+        if resp.status_code in (401, 403):
+            return False, "Identifiants HTTP Basic Auth Stremio refusés."
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+            except Exception:
+                return False, "Réponse Stremio non-JSON sur /settings."
+            if not isinstance(data, dict) or not any(
+                k in data for k in ("values", "serverVersion", "cacheSize")
+            ):
+                return False, "L'URL répond mais ne semble pas être un serveur Stremio."
+            values = data.get("values") if isinstance(data.get("values"), dict) else data
+            ver = str(
+                (values or {}).get("serverVersion") or data.get("serverVersion") or ""
+            ).strip()
+            return True, (
+                f"Connecté à Stremio Server (v{ver})."
+                if ver
+                else "Connecté à Stremio Server."
+            )
+        return False, f"Erreur Stremio HTTP {resp.status_code}."
 
     if service in _ARR_STATUS_PATHS:
         if not is_secret_configured(secret):
@@ -369,6 +404,9 @@ _ENV_TO_CONFIG_MAP: dict[str, tuple[str, ...]] = {
     "JELLYSEERR_API_KEY": ("integrations", "jellyseerr", "api_key"),
     "PLEX_URL": ("integrations", "plex", "url"),
     "PLEX_TOKEN": ("integrations", "plex", "token"),
+    "STREMIO_URL": ("integrations", "stremio", "url"),
+    "STREMIO_USERNAME": ("integrations", "stremio", "username"),
+    "STREMIO_PASSWORD": ("integrations", "stremio", "password"),
     "RADARR_URL": ("integrations", "radarr", "url"),
     "RADARR_API_KEY": ("integrations", "radarr", "api_key"),
     "SONARR_URL": ("integrations", "sonarr", "url"),
@@ -386,6 +424,7 @@ _SETUP_SECRET_ENV_KEYS = frozenset(
         "JELLYFIN_API_KEY",
         "JELLYSEERR_API_KEY",
         "PLEX_TOKEN",
+        "STREMIO_PASSWORD",
         "RADARR_API_KEY",
         "SONARR_API_KEY",
         "PROWLARR_API_KEY",

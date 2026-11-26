@@ -10,6 +10,7 @@ from app.services.media_clients import (
     fetch_qbittorrent_widget,
     fetch_radarr_widget,
     fetch_sonarr_widget,
+    fetch_stremio_widget,
 )
 
 router = APIRouter(prefix="/api/widgets", tags=["widgets"])
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/widgets", tags=["widgets"])
 WIDGET_HANDLERS = {
     "jellyfin": fetch_jellyfin_widget,
     "plex": fetch_plex_widget,
+    "stremio": fetch_stremio_widget,
     "radarr": fetch_radarr_widget,
     "sonarr": fetch_sonarr_widget,
     "prowlarr": fetch_prowlarr_widget,

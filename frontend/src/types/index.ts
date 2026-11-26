@@ -517,6 +517,15 @@ export interface PlexWidget {
   version?: string;
 }
 
+export interface StremioWidget {
+  status: string;
+  server_version?: string;
+  hw_accel_enabled?: boolean;
+  hw_accel_profiles?: string[];
+  cache_size_bytes?: number | null;
+  bt_max_connections?: number | null;
+}
+
 export interface UpcomingItem {
   title: string;
   date: string;
@@ -561,6 +570,7 @@ export interface QbittorrentWidget {
 export interface WidgetsMap {
   jellyfin?: JellyfinWidget;
   plex?: PlexWidget;
+  stremio?: StremioWidget;
   radarr?: RadarrWidget;
   sonarr?: SonarrWidget;
   prowlarr?: ProwlarrWidget;
@@ -660,6 +670,9 @@ export interface SetupEnvConfig {
   jellyseerr_api_key_set: boolean;
   plex_url: string;
   plex_token_set: boolean;
+  stremio_url?: string;
+  stremio_username?: string;
+  stremio_password_set?: boolean;
   radarr_url: string;
   radarr_api_key_set: boolean;
   sonarr_url: string;
@@ -707,6 +720,7 @@ export type SetupTestServiceName =
   | 'jellyfin'
   | 'jellyseerr'
   | 'plex'
+  | 'stremio'
   | 'radarr'
   | 'sonarr'
   | 'prowlarr'

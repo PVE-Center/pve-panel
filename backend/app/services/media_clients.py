@@ -329,6 +329,99 @@ async def fetch_plex_widget(client: httpx.AsyncClient) -> dict[str, Any]:
         return {"status": "error", "error": str(exc)[:120]}
 
 
+async def fetch_stremio_widget(client: httpx.AsyncClient) -> dict[str, Any]:
+    """Fetch server version, hardware acceleration profiles, and cache settings from Stremio."""
+    settings = get_settings()
+    if not settings.stremio_url:
+        return {"status": "unconfigured"}
+
+    base = settings.stremio_url.rstrip("/")
+    auth = (
+        httpx.BasicAuth(settings.stremio_username, settings.stremio_password)
+        if settings.stremio_username and is_secret_configured(settings.stremio_password)
+        else None
+    )
+
+    try:
+        settings_req = client.get(f"{base}/settings", auth=auth, timeout=2.5)
+        device_req = client.get(f"{base}/device-info", auth=auth, timeout=2.5)
+        settings_resp, device_resp = await asyncio.gather(
+            settings_req, device_req, return_exceptions=True
+        )
+
+        if isinstance(settings_resp, Exception):
+            return {"status": "error", "error": str(settings_resp)[:120]}
+
+        if settings_resp.status_code in (401, 403):
+            return {"status": "error", "error": "Authentification Stremio refusée"}
+
+        if settings_resp.status_code != 200:
+            return {"status": "error", "error": f"HTTP {settings_resp.status_code}"}
+
+        try:
+            payload = settings_resp.json()
+        except Exception:
+            return {"status": "error", "error": "Réponse Stremio non-JSON"}
+
+        if not isinstance(payload, dict):
+            return {"status": "error", "error": "Format de réponse Stremio invalide"}
+
+        values = payload.get("values") if isinstance(payload.get("values"), dict) else payload
+        if not isinstance(values, dict):
+            values = payload
+
+        server_version = str(
+            values.get("serverVersion") or payload.get("serverVersion") or ""
+        ).strip()
+
+        raw_cache = values.get("cacheSize")
+        cache_size_bytes: int | None
+        if isinstance(raw_cache, (int, float)) and not isinstance(raw_cache, bool) and raw_cache >= 0:
+            cache_size_bytes = int(raw_cache)
+        else:
+            cache_size_bytes = None
+
+        raw_bt_conn = values.get("btMaxConnections")
+        bt_max_connections = (
+            int(raw_bt_conn)
+            if isinstance(raw_bt_conn, (int, float)) and not isinstance(raw_bt_conn, bool)
+            else None
+        )
+
+        hw_accel_profiles: list[str] = []
+        if not isinstance(device_resp, Exception) and device_resp.status_code == 200:
+            try:
+                device_payload = device_resp.json()
+                if isinstance(device_payload, dict):
+                    raw_profiles = device_payload.get("availableHardwareAccelerations")
+                    if isinstance(raw_profiles, list):
+                        hw_accel_profiles = [
+                            str(p).strip() for p in raw_profiles if str(p).strip()
+                        ]
+            except Exception:
+                pass
+
+        if not hw_accel_profiles and isinstance(values.get("availableHardwareAccelerations"), list):
+            hw_accel_profiles = [
+                str(p).strip()
+                for p in values["availableHardwareAccelerations"]
+                if str(p).strip()
+            ]
+
+        hw_accel_enabled = bool(hw_accel_profiles) or bool(values.get("transcodeHardwareAccel"))
+
+        return {
+            "status": "ok",
+            "server_version": server_version or "OK",
+            "hw_accel_enabled": hw_accel_enabled,
+            "hw_accel_profiles": hw_accel_profiles[:4],
+            "cache_size_bytes": cache_size_bytes,
+            "bt_max_connections": bt_max_connections,
+        }
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)[:120]}
+
+
 async def fetch_radarr_widget(client: httpx.AsyncClient) -> dict[str, Any]:
     """Fetch movies stats, queue count, and upcoming releases from Radarr."""
     settings = get_settings()
@@ -548,6 +641,7 @@ async def fetch_all_widgets(client: httpx.AsyncClient) -> dict[str, Any]:
     results = await asyncio.gather(
         fetch_jellyfin_widget(client),
         fetch_plex_widget(client),
+        fetch_stremio_widget(client),
         fetch_radarr_widget(client),
         fetch_sonarr_widget(client),
         fetch_prowlarr_widget(client),
@@ -556,8 +650,9 @@ async def fetch_all_widgets(client: httpx.AsyncClient) -> dict[str, Any]:
     return {
         "jellyfin": results[0],
         "plex": results[1],
-        "radarr": results[2],
-        "sonarr": results[3],
-        "prowlarr": results[4],
-        "qbittorrent": results[5],
+        "stremio": results[2],
+        "radarr": results[3],
+        "sonarr": results[4],
+        "prowlarr": results[5],
+        "qbittorrent": results[6],
     }

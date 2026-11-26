@@ -23,6 +23,7 @@ const WIDGET_OPTIONS = [
   { value: '', label: 'Aucun widget' },
   { value: 'jellyfin', label: 'Widget Jellyfin (flux, films, séries)' },
   { value: 'plex', label: 'Widget Plex (flux, librairies)' },
+  { value: 'stremio', label: 'Widget Stremio (version, VAAPI, cache)' },
   { value: 'radarr', label: 'Widget Radarr (films, file)' },
   { value: 'sonarr', label: 'Widget Sonarr (séries, épisodes)' },
   { value: 'prowlarr', label: 'Widget Prowlarr (indexeurs, grabs)' },

@@ -81,6 +81,9 @@ interface SetupEnvFormState {
   jellyseerr_api_key: string;
   plex_url: string;
   plex_token: string;
+  stremio_url: string;
+  stremio_username: string;
+  stremio_password: string;
   radarr_url: string;
   radarr_api_key: string;
   sonarr_url: string;
@@ -97,6 +100,7 @@ type SecretFlagMap = Record<
   | 'jellyfin_api_key_set'
   | 'jellyseerr_api_key_set'
   | 'plex_token_set'
+  | 'stremio_password_set'
   | 'radarr_api_key_set'
   | 'sonarr_api_key_set'
   | 'prowlarr_api_key_set'
@@ -154,6 +158,17 @@ const MEDIA_SERVICES: MediaServiceDescriptor[] = [
     secretLabel: 'X-Plex-Token',
   },
   {
+    key: 'stremio',
+    label: 'Stremio (Web + Server)',
+    subtitle: 'Streaming Web tout-en-un & VAAPI',
+    urlKey: 'stremio_url',
+    urlPlaceholder: 'http://192.168.1.33:8080',
+    secretKey: 'stremio_password',
+    secretSetKey: 'stremio_password_set',
+    secretLabel: 'Mot de passe Basic Auth (optionnel)',
+    usernameKey: 'stremio_username',
+  },
+  {
     key: 'radarr',
     label: 'Radarr',
     subtitle: 'Automatisation des films',
@@ -200,6 +215,7 @@ const WIDGET_OPTIONS = [
   { value: '', label: 'Aucun widget' },
   { value: 'jellyfin', label: 'Widget Jellyfin' },
   { value: 'plex', label: 'Widget Plex' },
+  { value: 'stremio', label: 'Widget Stremio' },
   { value: 'radarr', label: 'Widget Radarr' },
   { value: 'sonarr', label: 'Widget Sonarr' },
   { value: 'prowlarr', label: 'Widget Prowlarr' },
@@ -225,6 +241,9 @@ function createEmptyEnvForm(): SetupEnvFormState {
     jellyseerr_api_key: '',
     plex_url: '',
     plex_token: '',
+    stremio_url: '',
+    stremio_username: 'admin',
+    stremio_password: '',
     radarr_url: '',
     radarr_api_key: '',
     sonarr_url: '',
@@ -243,6 +262,7 @@ function createEmptySecretFlags(): SecretFlagMap {
     jellyfin_api_key_set: false,
     jellyseerr_api_key_set: false,
     plex_token_set: false,
+    stremio_password_set: false,
     radarr_api_key_set: false,
     sonarr_api_key_set: false,
     prowlarr_api_key_set: false,
@@ -267,6 +287,9 @@ function envToFormState(env: SetupEnvConfig): SetupEnvFormState {
     jellyseerr_api_key: '',
     plex_url: env.plex_url || '',
     plex_token: '',
+    stremio_url: env.stremio_url || '',
+    stremio_username: env.stremio_username || 'admin',
+    stremio_password: '',
     radarr_url: env.radarr_url || '',
     radarr_api_key: '',
     sonarr_url: env.sonarr_url || '',
@@ -285,6 +308,7 @@ function extractSecretFlags(env: SetupEnvConfig): SecretFlagMap {
     jellyfin_api_key_set: Boolean(env.jellyfin_api_key_set),
     jellyseerr_api_key_set: Boolean(env.jellyseerr_api_key_set),
     plex_token_set: Boolean(env.plex_token_set),
+    stremio_password_set: Boolean(env.stremio_password_set),
     radarr_api_key_set: Boolean(env.radarr_api_key_set),
     sonarr_api_key_set: Boolean(env.sonarr_api_key_set),
     prowlarr_api_key_set: Boolean(env.prowlarr_api_key_set),
@@ -642,6 +666,9 @@ export function SetupWizardModal({
           jellyseerr_api_key: form.jellyseerr_api_key,
           plex_url: form.plex_url.trim(),
           plex_token: form.plex_token,
+          stremio_url: form.stremio_url.trim(),
+          stremio_username: form.stremio_username.trim(),
+          stremio_password: form.stremio_password,
           radarr_url: form.radarr_url.trim(),
           radarr_api_key: form.radarr_api_key,
           sonarr_url: form.sonarr_url.trim(),
